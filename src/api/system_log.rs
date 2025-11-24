@@ -23,8 +23,7 @@ use crate::{
 
 pub fn log_routes(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/", post(create_system_log))
-        .route("/", get(get_system_log_page))
+        .route("/", post(create_system_log).get(get_system_log_page))
         .route("/count", get(get_log_category_count))
         .with_state(state)
 }

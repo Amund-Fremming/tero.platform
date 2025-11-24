@@ -6,6 +6,7 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use axum_valid::Valid;
 use reqwest::StatusCode;
 use tracing::error;
 
@@ -34,38 +35,8 @@ pub fn protected_game_tip_routes(state: Arc<AppState>) -> Router {
 
 async fn create_game_tip(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<CreateGameTipRequest>,
+    Valid(Json(request)): Valid<Json<CreateGameTipRequest>>,
 ) -> Result<impl IntoResponse, ServerError> {
-    // Validate input lengths
-    if request.header.len() > 100 {
-        return Err(ServerError::Api(
-            StatusCode::BAD_REQUEST,
-            "Header must be 100 characters or less".into(),
-        ));
-    }
-    
-    if request.mobile_phone.len() > 20 {
-        return Err(ServerError::Api(
-            StatusCode::BAD_REQUEST,
-            "Mobile phone must be 20 characters or less".into(),
-        ));
-    }
-    
-    if request.description.len() > 500 {
-        return Err(ServerError::Api(
-            StatusCode::BAD_REQUEST,
-            "Description must be 500 characters or less".into(),
-        ));
-    }
-    
-    if request.header.trim().is_empty() || request.mobile_phone.trim().is_empty() || request.description.trim().is_empty() {
-        return Err(ServerError::Api(
-            StatusCode::BAD_REQUEST,
-            "Header, mobile phone, and description are required".into(),
-        ));
-    }
-    
-    // Anyone can submit a game tip - no authentication required
     let tip_id = db::game_tip::create_game_tip(state.get_pool(), &request).await?;
     
     Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": tip_id }))))

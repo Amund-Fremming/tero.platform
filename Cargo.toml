@@ -32,3 +32,5 @@ rand_chacha = "0.9.0"
 config = "0.15.16"
 dashmap = "6.1.0"
 futures = "0.3.31"
+axum-valid = "0.24.0"
+validator = { version = "0.20.0", features = ["derive"] }

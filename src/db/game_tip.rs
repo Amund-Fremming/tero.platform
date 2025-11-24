@@ -9,7 +9,6 @@ use crate::{
         game_tip::{CreateGameTipRequest, GameTip},
         popup_manager::PagedResponse,
     },
-    service::db_query_builder::DBQueryBuilder,
 };
 
 pub async fn create_game_tip(
@@ -19,23 +18,19 @@ pub async fn create_game_tip(
     let id = Uuid::new_v4();
     let created_at = Utc::now();
 
-    let row = sqlx::query(
+    sqlx::query!(
         r#"
         INSERT INTO "game_tip" (id, header, mobile_phone, description, created_at)
         VALUES ($1, $2, $3, $4, $5)
         "#,
+        id,
+        &request.header,
+        &request.mobile_phone,
+        &request.description,
+        created_at
     )
-    .bind(id)
-    .bind(&request.header)
-    .bind(&request.mobile_phone)
-    .bind(&request.description)
-    .bind(created_at)
     .execute(pool)
     .await?;
-
-    if row.rows_affected() == 0 {
-        return Err(ServerError::Internal("Failed to create game tip".into()));
-    }
 
     Ok(id)
 }
@@ -45,22 +40,20 @@ pub async fn get_game_tips_page(
     page_num: u16,
 ) -> Result<PagedResponse<GameTip>, sqlx::Error> {
     let page_size = CONFIG.server.page_size as u16;
+    let offset = (page_size * page_num) as i64;
+    let limit = (page_size + 1) as i64;
     
-    let tips = DBQueryBuilder::select(
+    let tips = sqlx::query_as!(
+        GameTip,
         r#"
-            id,
-            header,
-            mobile_phone,
-            description,
-            created_at
+        SELECT id, header, mobile_phone, description, created_at
+        FROM game_tip
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2
         "#,
+        limit,
+        offset
     )
-    .from("game_tip")
-    .offset(page_size * page_num)
-    .limit(page_size + 1)
-    .order_desc("created_at")
-    .build()
-    .build_query_as::<GameTip>()
     .fetch_all(pool)
     .await?;
 
