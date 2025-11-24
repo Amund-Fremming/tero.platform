@@ -16,32 +16,45 @@ pub async fn get_system_log_page(
     request: SyslogPageQuery,
 ) -> Result<PagedResponse<SystemLog>, sqlx::Error> {
     let page_size = CONFIG.server.page_size as u16;
-    let logs = DBQueryBuilder::select(
+    let offset = (page_size * request.page_num) as i64;
+    let limit = (page_size + 1) as i64;
+    
+    let logs = sqlx::query_as!(
+        SystemLog,
         r#"
+        SELECT 
             id,
             subject_id,
-            subject_type,
-            action,
-            ceverity,
+            subject_type as "subject_type: SubjectType",
+            action as "action: LogAction",
+            ceverity as "ceverity: LogCeverity",
             function,
             description,
-            metadata
+            metadata,
+            created_at
+        FROM system_log
+        WHERE ($1::text IS NULL OR subject_type = $1)
+          AND ($2::text IS NULL OR action = $2)
+          AND ($3::text IS NULL OR ceverity = $3)
+        ORDER BY created_at DESC
+        LIMIT $4 OFFSET $5
         "#,
+        request.subject_type.as_ref().map(|s| s.to_string()),
+        request.action.as_ref().map(|a| a.to_string()),
+        request.ceverity.as_ref().map(|c| c.to_string()),
+        limit,
+        offset
     )
-    .from("system_log")
-    .where_opt("subject_type", &request.subject_type)
-    .where_opt("action", &request.action)
-    .where_opt("ceverity", &request.ceverity)
-    .offset(page_size * request.page_num)
-    .limit(page_size + 1)
-    .order_desc("created_at")
-    .build()
-    .build_query_as::<SystemLog>()
     .fetch_all(pool)
     .await?;
 
-    let has_next = logs.len() < (page_size + 1) as usize;
-    let page = PagedResponse::new(logs, has_next);
+    let has_next = logs.len() >= page_size as usize;
+    let mut items = logs;
+    if has_next {
+        items.truncate(page_size as usize);
+    }
+    
+    let page = PagedResponse::new(items, has_next);
 
     Ok(page)
 }
