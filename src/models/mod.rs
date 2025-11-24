@@ -2,6 +2,7 @@ pub mod app_state;
 pub mod auth;
 pub mod error;
 pub mod game_base;
+pub mod game_tip;
 pub mod integration;
 pub mod popup_manager;
 pub mod quiz_game;

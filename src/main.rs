@@ -12,6 +12,7 @@ use crate::{
     api::{
         auth_mw::auth_mw,
         game_base::game_routes,
+        game_tip::{protected_game_tip_routes, public_game_tip_routes},
         health::health_routes,
         system_log::log_routes,
         user::{auth0_trigger_endpoint, protected_auth_routes, public_auth_routes},
@@ -71,12 +72,14 @@ async fn main() {
 
     let public_routes = Router::new()
         .nest("/health", health_routes(state.clone()))
-        .nest("/pseudo-users", public_auth_routes(state.clone()));
+        .nest("/pseudo-users", public_auth_routes(state.clone()))
+        .nest("/tips", public_game_tip_routes(state.clone()));
 
     let protected_routes = Router::new()
         .nest("/games", game_routes(state.clone()))
         .nest("/users", protected_auth_routes(state.clone()))
         .nest("/logs", log_routes(state.clone()))
+        .nest("/tips", protected_game_tip_routes(state.clone()))
         .layer(from_fn_with_state(state.clone(), auth_mw));
 
     let app = Router::new()
