@@ -64,7 +64,7 @@ pub async fn get_game_tips_page(
     .fetch_all(pool)
     .await?;
 
-    let has_next = tips.len() > page_size as usize;
+    let has_next = tips.len() >= page_size as usize;
     let mut items = tips;
     if has_next {
         items.truncate(page_size as usize);

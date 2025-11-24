@@ -36,6 +36,35 @@ async fn create_game_tip(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CreateGameTipRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    // Validate input lengths
+    if request.header.len() > 100 {
+        return Err(ServerError::Api(
+            StatusCode::BAD_REQUEST,
+            "Header must be 100 characters or less".into(),
+        ));
+    }
+    
+    if request.mobile_phone.len() > 20 {
+        return Err(ServerError::Api(
+            StatusCode::BAD_REQUEST,
+            "Mobile phone must be 20 characters or less".into(),
+        ));
+    }
+    
+    if request.description.len() > 500 {
+        return Err(ServerError::Api(
+            StatusCode::BAD_REQUEST,
+            "Description must be 500 characters or less".into(),
+        ));
+    }
+    
+    if request.header.trim().is_empty() || request.mobile_phone.trim().is_empty() || request.description.trim().is_empty() {
+        return Err(ServerError::Api(
+            StatusCode::BAD_REQUEST,
+            "Header, mobile phone, and description are required".into(),
+        ));
+    }
+    
     // Anyone can submit a game tip - no authentication required
     let tip_id = db::game_tip::create_game_tip(state.get_pool(), &request).await?;
     
