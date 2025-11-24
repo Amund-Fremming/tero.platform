@@ -29,7 +29,6 @@ impl QuizSession {
             quiz_id: Uuid::new_v4(),
             name: request.name,
             description: request.description,
-            state: QuizGameState::Initialized,
             category: request.category.unwrap_or(GameCategory::Default),
             iterations: 0,
             current_iteration: 0,
