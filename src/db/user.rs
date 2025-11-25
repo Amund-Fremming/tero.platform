@@ -364,7 +364,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM game_base").fetch_one(pool);
 
     let total_user_count_fut =
-        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM base_user").fetch_one(pool);
+        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user").fetch_one(pool);
 
     let (recent, average, total_game_count, total_user_count): (
         Result<RecentUserStats, sqlx::Error>,

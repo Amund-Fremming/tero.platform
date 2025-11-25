@@ -6,9 +6,10 @@ use crate::{
     models::{
         error::ServerError,
         popup_manager::PagedResponse,
-        system_log::{LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog},
+        system_log::{
+            LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
+        },
     },
-    service::db_query_builder::DBQueryBuilder,
 };
 
 pub async fn get_system_log_page(
@@ -18,7 +19,7 @@ pub async fn get_system_log_page(
     let page_size = CONFIG.server.page_size as u16;
     let offset = (page_size * request.page_num) as i64;
     let limit = (page_size + 1) as i64;
-    
+
     let logs = sqlx::query_as!(
         SystemLog,
         r#"
@@ -28,14 +29,14 @@ pub async fn get_system_log_page(
             subject_type as "subject_type: SubjectType",
             action as "action: LogAction",
             ceverity as "ceverity: LogCeverity",
-            function,
+            file_name,
             description,
             metadata,
             created_at
         FROM system_log
-        WHERE ($1::text IS NULL OR subject_type = $1)
-          AND ($2::text IS NULL OR action = $2)
-          AND ($3::text IS NULL OR ceverity = $3)
+        WHERE ($1::text IS NULL OR subject_type::text = $1)
+          AND ($2::text IS NULL OR action::text = $2)
+          AND ($3::text IS NULL OR ceverity::text = $3)
         ORDER BY created_at DESC
         LIMIT $4 OFFSET $5
         "#,
@@ -53,7 +54,7 @@ pub async fn get_system_log_page(
     if has_next {
         items.truncate(page_size as usize);
     }
-    
+
     let page = PagedResponse::new(items, has_next);
 
     Ok(page)
@@ -111,7 +112,7 @@ pub async fn get_log_category_count(
             COUNT(*) FILTER (WHERE ceverity = 'warning') as warning,
             COUNT(*) FILTER (WHERE ceverity = 'critical') as critical
         FROM system_log
-        "#
+        "#,
     )
     .fetch_one(pool)
     .await?;

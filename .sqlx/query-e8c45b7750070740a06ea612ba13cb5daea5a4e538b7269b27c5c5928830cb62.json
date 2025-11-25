@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            base.id AS base_id,\n            spin.id AS spin_id,\n            base.name,\n            base.description,\n            base.game_type as \"game_type: _\",\n            base.category as \"category: _\",\n            base.iterations,\n            base.times_played,\n            base.last_played,\n            spin.rounds\n        FROM \"game_base\" base\n        JOIN \"spin_game\" spin\n        ON base.id = spin.base_id\n        WHERE base.id = $1\n        ",
+  "query": "\n        SELECT \n            base.id AS base_id,\n            quiz.id AS quiz_id,\n            base.name,\n            base.description,\n            base.category as \"category: _\",\n            base.iterations,\n            base.times_played as \"times_played!\",\n            0 AS \"current_iteration!\",\n            quiz.questions\n        FROM \"game_base\" base\n        JOIN \"quiz_game\" quiz\n        ON base.id = quiz.base_id\n        WHERE base.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "spin_id",
+        "name": "quiz_id",
         "type_info": "Uuid"
       },
       {
@@ -25,21 +25,6 @@
       },
       {
         "ordinal": 4,
-        "name": "game_type: _",
-        "type_info": {
-          "Custom": {
-            "name": "game_type",
-            "kind": {
-              "Enum": [
-                "spin",
-                "quiz"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "ordinal": 5,
         "name": "category: _",
         "type_info": {
           "Custom": {
@@ -57,23 +42,23 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "iterations",
         "type_info": "Int4"
       },
       {
+        "ordinal": 6,
+        "name": "times_played!",
+        "type_info": "Int4"
+      },
+      {
         "ordinal": 7,
-        "name": "times_played",
+        "name": "current_iteration!",
         "type_info": "Int4"
       },
       {
         "ordinal": 8,
-        "name": "last_played",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 9,
-        "name": "rounds",
+        "name": "questions",
         "type_info": "TextArray"
       }
     ],
@@ -90,10 +75,9 @@
       false,
       false,
       false,
-      false,
-      false,
+      null,
       false
     ]
   },
-  "hash": "eb72e15ee6eb6de0b7a528bf47a844bd827ee244bdd087e6620b7db705337c4d"
+  "hash": "e8c45b7750070740a06ea612ba13cb5daea5a4e538b7269b27c5c5928830cb62"
 }

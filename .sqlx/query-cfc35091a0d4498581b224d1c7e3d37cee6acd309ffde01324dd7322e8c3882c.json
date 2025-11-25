@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT COUNT(*)::bigint as count FROM base_user",
+  "query": "SELECT COUNT(*)::bigint as count FROM pseudo_user",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "ec866773d94ebcd9eb71f97d59693a354036a15d67e917c3e93290af8268e78f"
+  "hash": "cfc35091a0d4498581b224d1c7e3d37cee6acd309ffde01324dd7322e8c3882c"
 }

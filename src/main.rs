@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     api::{
         auth_mw::auth_mw,
-        game_base::game_routes,
+        game::game_routes,
         game_tip::{protected_game_tip_routes, public_game_tip_routes},
         health::health_routes,
         system_log::log_routes,
