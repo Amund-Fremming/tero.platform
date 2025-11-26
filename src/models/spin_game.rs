@@ -38,18 +38,11 @@ pub struct SpinSession {
     pub name: String,
     pub description: Option<String>,
     pub category: GameCategory,
-    pub state: SpinGameState,
     pub iterations: i32,
     pub times_played: i32,
     pub last_played: DateTime<Utc>,
     pub rounds: Vec<String>,
     pub players: Vec<SpinGamePlayer>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SpinGameState {
-    Initialized,
-    Started,
 }
 
 impl SpinSession {
@@ -64,7 +57,6 @@ impl SpinSession {
             base_id: Uuid::new_v4(),
             host_id: user_id,
             name: request.name,
-            state: SpinGameState::Initialized,
             description: request.description,
             category: request.category.unwrap_or_else(|| GameCategory::Default),
             iterations: 0,
@@ -86,7 +78,6 @@ impl SpinSession {
             base_id: game.base_id,
             host_id: user_id,
             name: game.name,
-            state: SpinGameState::Initialized,
             description: game.description,
             category: game.category,
             iterations: game.iterations,
