@@ -17,37 +17,56 @@ pub async fn get_system_log_page(
     request: SyslogPageQuery,
 ) -> Result<PagedResponse<SystemLog>, sqlx::Error> {
     let page_size = CONFIG.server.page_size as u16;
-    let offset = (page_size * request.page_num) as i64;
+    let offset = (page_size * request.page_num.unwrap_or(0)) as i64;
     let limit = (page_size + 1) as i64;
 
-    let logs = sqlx::query_as!(
-        SystemLog,
-        r#"
+    let mut query = r#"
         SELECT 
             id,
             subject_id,
-            subject_type as "subject_type: SubjectType",
-            action as "action: LogAction",
-            ceverity as "ceverity: LogCeverity",
+            subject_type,
+            action,
+            ceverity,
             file_name,
             description,
             metadata,
             created_at
-        FROM system_log
-        WHERE ($1::text IS NULL OR subject_type::text = $1)
-          AND ($2::text IS NULL OR action::text = $2)
-          AND ($3::text IS NULL OR ceverity::text = $3)
+        FROM system_log 
+    "#
+    .to_string();
+
+    let mut where_clause = Vec::new();
+
+    if let Some(subject_type) = request.subject_type {
+        where_clause.push(format!(" subject_type = '{}'", subject_type));
+    }
+
+    if let Some(action) = request.action {
+        where_clause.push(format!(" action = '{}'", action));
+    }
+
+    if let Some(ceverity) = request.ceverity {
+        where_clause.push(format!(" ceverity = '{}'", ceverity));
+    }
+
+    if !where_clause.is_empty() {
+        let conditions = where_clause.join(" AND ");
+        query.push_str(&format!("WHERE {}", conditions));
+    }
+
+    query.push_str(&format!(
+        r#"
         ORDER BY created_at DESC
-        LIMIT $4 OFFSET $5
-        "#,
-        request.subject_type.as_ref().map(|s| s.to_string()),
-        request.action.as_ref().map(|a| a.to_string()),
-        request.ceverity.as_ref().map(|c| c.to_string()),
-        limit,
-        offset
-    )
-    .fetch_all(pool)
-    .await?;
+        LIMIT {} OFFSET {} 
+    "#,
+        limit, offset
+    ));
+
+    println!("{}", query);
+
+    let logs = sqlx::query_as::<_, SystemLog>(&query)
+        .fetch_all(pool)
+        .await?;
 
     let has_next = logs.len() >= page_size as usize;
     let mut items = logs;
