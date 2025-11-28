@@ -1,0 +1,25 @@
+name: CI Pipeline
+
+on: [push, pull-request]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4 # To access code from the repo
+
+      - name: Install cargo-audit and cargo-deny
+        run: cargo install cargo-audit cargo-deny
+
+      - name: Security check
+        run: cargo audit
+
+      - name: Dependency policy check
+        run: cargo deny check
+
+      - name: Clippy check
+        run: cargo clippy
+
+      - name: Unit tests
+        run: cargo test
