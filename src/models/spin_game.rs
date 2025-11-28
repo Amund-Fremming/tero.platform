@@ -23,7 +23,6 @@ pub struct SpinGame {
     pub base_id: Uuid,
     pub name: String,
     pub description: Option<String>,
-    pub state: SpinGameState,
     pub category: GameCategory,
     pub iterations: i32,
     pub times_played: i32,

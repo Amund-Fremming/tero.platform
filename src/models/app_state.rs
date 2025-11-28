@@ -6,17 +6,13 @@ use reqwest::Client;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    client::gs_client::GSClient,
-    config::config::CONFIG,
-    db::game_base::delete_non_active_games,
-    models::{
+    api::gs_client::GSClient, config::config::CONFIG, db::game_base::delete_non_active_games, models::{
         auth::Jwks,
         error::ServerError,
         game_base::GameBase,
         popup_manager::{PagedResponse, PopupManager},
         system_log::{LogAction, LogCeverity},
-    },
-    service::{cache::GustCache, key_vault::KeyVault, system_log_builder::SystemLogBuilder},
+    }, service::{cache::GustCache, key_vault::KeyVault, system_log_builder::SystemLogBuilder}
 };
 
 #[derive(Clone)]

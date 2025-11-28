@@ -5,7 +5,7 @@ use thiserror::Error;
 use tracing::error;
 
 use crate::{
-    client::gs_client::GSClientError, models::user::Permission, service::key_vault::KeyVaultError,
+    api::gs_client::GSClientError, models::user::Permission, service::key_vault::KeyVaultError,
 };
 
 #[derive(Debug, Error)]
