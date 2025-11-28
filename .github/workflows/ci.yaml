@@ -9,8 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4 # To access code from the repo
 
-      - name: Install cargo-audit and cargo-deny
-        run: cargo install cargo-audit cargo-deny
+      - name: Install cargo crates
+        run: cargo install cargo-audit cargo-deny cargo-chef
 
       - name: Security check
         run: cargo audit
@@ -23,3 +23,9 @@ jobs:
 
       - name: Unit tests
         run: cargo test
+
+      - name: Build
+        run: |
+          cargo chef prepare --recipe-path recipe.json
+          cargo chef cook --recipe-path recipe.json
+          cargo build --release
