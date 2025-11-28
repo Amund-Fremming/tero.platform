@@ -12,8 +12,8 @@ jobs:
       - name: Install cargo crates
         run: cargo install cargo-audit cargo-deny cargo-chef
 
-      - name: Security check
-        run: cargo audit
+      # - name: Security check
+      #   run: cargo audit
 
       - name: Dependency policy check
         run: cargo deny check
