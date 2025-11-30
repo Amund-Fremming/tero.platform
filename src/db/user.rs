@@ -9,14 +9,13 @@ use crate::{
     models::{
         error::ServerError,
         game_base::Gender,
-        popup_manager::PagedResponse,
         system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
             RecentUserStats,
         },
     },
-    service::system_log_builder::SystemLogBuilder,
+    service::{popup_manager::PagedResponse, system_log_builder::SystemLogBuilder},
 };
 
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {

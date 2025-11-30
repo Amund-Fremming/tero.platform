@@ -5,11 +5,11 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        popup_manager::PagedResponse,
         system_log::{
             LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
         },
     },
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn get_system_log_page(

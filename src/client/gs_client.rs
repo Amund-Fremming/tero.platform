@@ -51,15 +51,6 @@ impl GSClient {
         Ok(())
     }
 
-    pub async fn create_interactive_game(
-        &self,
-        client: &Client,
-        envelope: &InteractiveEnvelope,
-    ) -> Result<(), GSClientError> {
-        let uri = format!("{}session/create", self.domain);
-        self.send_json(client, &uri, envelope).await
-    }
-
     pub async fn initiate_game_session(
         &self,
         client: &Client,

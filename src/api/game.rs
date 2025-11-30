@@ -179,7 +179,7 @@ async fn create_interactive_game(
         payload,
     };
 
-    gs_client.create_interactive_game(client, &envelope).await?;
+    gs_client.initiate_game_session(client, &envelope).await?;
 
     let hub_address = format!(
         "{}/hubs/{}",

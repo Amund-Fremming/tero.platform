@@ -4,7 +4,6 @@ pub mod error;
 pub mod game_base;
 pub mod game_tip;
 pub mod integration;
-pub mod popup_manager;
 pub mod quiz_game;
 pub mod spin_game;
 pub mod system_log;

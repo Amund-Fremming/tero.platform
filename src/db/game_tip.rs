@@ -7,8 +7,8 @@ use crate::{
     models::{
         error::ServerError,
         game_tip::{CreateGameTipRequest, GameTip},
-        popup_manager::PagedResponse,
     },
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn create_game_tip(

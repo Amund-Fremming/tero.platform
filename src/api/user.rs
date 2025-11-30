@@ -25,14 +25,13 @@ use crate::{
         app_state::AppState,
         auth::Claims,
         error::ServerError,
-        popup_manager::ClientPopup,
         system_log::{LogAction, LogCeverity},
         user::{
             Auth0User, EnsureUserQuery, ListUsersQuery, PatchUserRequest, Permission, SubjectId,
             UserRole,
         },
     },
-    service::system_log_builder::SystemLogBuilder,
+    service::{popup_manager::ClientPopup, system_log_builder::SystemLogBuilder},
 };
 
 pub fn public_auth_routes(state: Arc<AppState>) -> Router {

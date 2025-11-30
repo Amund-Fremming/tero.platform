@@ -8,8 +8,8 @@ use crate::{
     models::{
         error::ServerError,
         game_base::{GameBase, GamePageQuery, GameType, SavedGamesPageQuery},
-        popup_manager::PagedResponse,
     },
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn delete_non_active_games(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
