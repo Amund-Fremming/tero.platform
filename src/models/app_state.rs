@@ -10,7 +10,6 @@ use crate::{
         auth::Jwks,
         error::ServerError,
         game_base::GameBase,
-        popup_manager::{PagedResponse, PopupManager},
         system_log::{LogAction, LogCeverity},
     }, service::{cache::GustCache, key_vault::KeyVault, system_log_builder::SystemLogBuilder}
 };

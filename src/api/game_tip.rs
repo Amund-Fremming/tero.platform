@@ -38,8 +38,11 @@ async fn create_game_tip(
     Valid(Json(request)): Valid<Json<CreateGameTipRequest>>,
 ) -> Result<impl IntoResponse, ServerError> {
     let tip_id = db::game_tip::create_game_tip(state.get_pool(), &request).await?;
-    
-    Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": tip_id }))))
+
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "id": tip_id })),
+    ))
 }
 
 async fn get_game_tips_admin(

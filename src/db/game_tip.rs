@@ -7,8 +7,8 @@ use crate::{
     models::{
         error::ServerError,
         game_tip::{CreateGameTipRequest, GameTip},
-        popup_manager::PagedResponse,
     },
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn create_game_tip(
@@ -42,7 +42,7 @@ pub async fn get_game_tips_page(
     let page_size = CONFIG.server.page_size as u16;
     let offset = (page_size * page_num) as i64;
     let limit = (page_size + 1) as i64;
-    
+
     let tips = sqlx::query_as!(
         GameTip,
         r#"
@@ -62,7 +62,7 @@ pub async fn get_game_tips_page(
     if has_next {
         items.truncate(page_size as usize);
     }
-    
+
     let page = PagedResponse::new(items, has_next);
 
     Ok(page)

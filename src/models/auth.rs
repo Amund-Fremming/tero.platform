@@ -24,7 +24,7 @@ pub struct Jwk {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     gty: Option<String>,
-    aud: Vec<String>,
+    aud: String,
     azp: String,
     exp: i32,
     iat: i32,
@@ -38,7 +38,7 @@ impl Claims {
     pub fn empty() -> Self {
         Self {
             gty: None,
-            aud: Vec::new(),
+            aud: String::new(),
             azp: String::new(),
             exp: 0,
             iat: 0,

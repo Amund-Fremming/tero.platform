@@ -9,14 +9,13 @@ use crate::{
     models::{
         error::ServerError,
         game_base::Gender,
-        popup_manager::PagedResponse,
         system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
             RecentUserStats,
         },
     },
-    service::system_log_builder::SystemLogBuilder,
+    service::{popup_manager::PagedResponse, system_log_builder::SystemLogBuilder},
 };
 
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {
@@ -364,7 +363,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM game_base").fetch_one(pool);
 
     let total_user_count_fut =
-        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM base_user").fetch_one(pool);
+        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user").fetch_one(pool);
 
     let (recent, average, total_game_count, total_user_count): (
         Result<RecentUserStats, sqlx::Error>,

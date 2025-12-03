@@ -3,17 +3,8 @@ mod tests {
     use std::{env, sync::Arc};
 
     use dotenv::dotenv;
-    use tracing::level_filters::LevelFilter;
 
     use crate::{models::app_state::AppState, service::key_vault::KeyVaultError};
-
-    fn setup_logging() {
-        tracing_subscriber::FmtSubscriber::builder()
-            .with_max_level(LevelFilter::DEBUG)
-            .with_test_writer()
-            .try_init()
-            .unwrap();
-    }
 
     async fn setup_app_state() -> Arc<AppState> {
         dotenv().ok();
@@ -27,7 +18,6 @@ mod tests {
 
     #[tokio::test]
     async fn max_limit_keys() {
-        setup_logging();
         let state = setup_app_state().await;
         let vault = state.get_vault();
 
@@ -48,7 +38,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_key_creation() {
-        setup_logging();
         let state = setup_app_state().await;
 
         let mut handles = Vec::new();

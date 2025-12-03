@@ -45,13 +45,6 @@ pub struct SpinSession {
     pub players: Vec<SpinGamePlayer>,
 }
 
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SpinGameState {
-    Initialized,
-    Started
-}
-
 impl SpinSession {
     pub fn from_create_request(user_id: Uuid, request: CreateGameRequest) -> Self {
         let player = SpinGamePlayer {

@@ -20,7 +20,7 @@ pub async fn get_spin_session_by_game_id(
             spin.id AS spin_id,
             base.name,
             base.description,
-            base.category as "category: _",
+            base.category AS "category: _",
             base.iterations,
             base.times_played,
             base.last_played,
@@ -39,6 +39,7 @@ pub async fn get_spin_session_by_game_id(
     Ok(session)
 }
 
+// TODO - update this
 pub async fn tx_persist_spin_session(
     tx: &mut Transaction<'_, Postgres>,
     session: &SpinSession,
