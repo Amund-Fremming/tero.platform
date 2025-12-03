@@ -12,9 +12,7 @@ use uuid::Uuid;
 use tracing::{debug, error};
 
 use crate::{
-    client::gs_client::InteractiveGameResponse,
-    config::config::CONFIG,
-    db::{
+    api::gs_client::InteractiveGameResponse, config::config::CONFIG, db::{
         self,
         game_base::{
             delete_saved_game, get_game_page, get_saved_games_page, increment_times_played,
@@ -22,8 +20,7 @@ use crate::{
         },
         quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
         spin_game::{get_spin_session_by_game_id, tx_persist_spin_session},
-    },
-    models::{
+    }, models::{
         app_state::AppState,
         auth::Claims,
         error::ServerError,
@@ -34,7 +31,7 @@ use crate::{
         quiz_game::QuizSession,
         spin_game::SpinSession,
         user::{Permission, SubjectId},
-    },
+    }
 };
 
 ///
@@ -61,11 +58,11 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             "/{game_type}/initiate/{game_id}",
             get(initiate_standalone_game),
         )
-        .route("/persist", post(persist_standalone_game))
+        .route("/persist/{game_type}", post(persist_standalone_game))
         .with_state(state.clone());
 
     let interactive_routes = Router::new()
-        .route("/persist", post(persist_interactive_game))
+        .route("/persist/{game_type}/{game_key}", post(persist_interactive_game))
         .route(
             "/{game_type}/initiate/{game_id}",
             post(initiate_interactive_game),
@@ -131,7 +128,7 @@ async fn join_interactive_game(
         game_type.column_name()
     );
     let response = InteractiveGameResponse {
-        key_word,
+        game_key: key_word,
         hub_address,
     };
 
@@ -159,7 +156,6 @@ async fn create_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    let key_word = vault.create_key(pool)?;
 
     let payload = match game_type {
         GameType::Spin => {
@@ -172,14 +168,12 @@ async fn create_interactive_game(
         }
     };
 
+    let game_key = vault.create_key(pool)?;
     let envelope = InteractiveEnvelope {
-        game_type: game_type.clone(),
-        host_id: user_id,
-        game_key: key_word.clone(),
         payload,
     };
 
-    gs_client.initiate_game_session(client, &envelope).await?;
+    gs_client.initiate_game_session(client, &game_type, &game_key,  &envelope).await?;
 
     let hub_address = format!(
         "{}/hubs/{}",
@@ -188,7 +182,7 @@ async fn create_interactive_game(
     );
 
     let response = InteractiveGameResponse {
-        key_word,
+        game_key,
         hub_address,
     };
 
@@ -237,7 +231,6 @@ async fn initiate_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    let key_word = vault.create_key(pool)?;
 
     let payload = match game_type {
         GameType::Spin => {
@@ -252,14 +245,12 @@ async fn initiate_interactive_game(
         }
     };
 
+    let game_key = vault.create_key(pool)?;
     let envelope = InteractiveEnvelope {
-        game_type: game_type.clone(),
-        host_id: user_id,
-        game_key: key_word.clone(),
         payload,
     };
 
-    gs_client.initiate_game_session(client, &envelope).await?;
+    gs_client.initiate_game_session(client, &game_type, &game_key, &envelope).await?;
 
     let hub_address = format!(
         "{}/hubs/{}",
@@ -268,7 +259,7 @@ async fn initiate_interactive_game(
     );
 
     let response = InteractiveGameResponse {
-        key_word,
+        game_key,
         hub_address,
     };
 
@@ -297,6 +288,7 @@ async fn get_games(
 pub async fn persist_standalone_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
+    Path(game_type): Path<GameType>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
@@ -304,7 +296,7 @@ pub async fn persist_standalone_game(
         return Err(ServerError::AccessDenied);
     }
 
-    match request.game_type {
+    match game_type {
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let mut tx = state.get_pool().begin().await?;
@@ -326,6 +318,7 @@ async fn persist_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
+    Path((game_type, game_key)): Path<(GameType, String)>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
@@ -337,7 +330,7 @@ async fn persist_interactive_game(
         return Err(ServerError::Permission(missing));
     }
 
-    let words: Vec<&str> = request.game_key.split(" ").collect();
+    let words: Vec<&str> = game_key.split(" ").collect();
     let tuple = match (words.get(0), words.get(1)) {
         (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
         _ => {
@@ -351,7 +344,7 @@ async fn persist_interactive_game(
     state.get_vault().remove_key(tuple);
     let pool = state.get_pool();
 
-    match request.game_type {
+    match game_type {
         GameType::Spin => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
             match session.times_played {

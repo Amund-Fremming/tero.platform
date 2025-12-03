@@ -27,7 +27,6 @@ use crate::{
 };
 
 mod api;
-mod client;
 mod config;
 mod db;
 mod models;

@@ -86,9 +86,6 @@ pub struct SavedGamesPageQuery {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InteractiveEnvelope {
-    pub game_key: String,
-    pub host_id: Uuid,
-    pub game_type: GameType,
     pub payload: serde_json::Value,
 }
 

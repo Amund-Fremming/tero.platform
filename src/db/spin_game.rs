@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::models::{
     error::ServerError,
-    spin_game::{SpinGame, SpinSession},
+    spin_game::{SpinSession, SpinGame},
 };
 
 pub async fn get_spin_session_by_game_id(
