@@ -2,13 +2,12 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    config::config::CONFIG,
     models::{
         error::ServerError,
         system_log::{
             LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
         },
-    },
+    }, service::popup_manager::PagedResponse,
 };
 
 pub async fn get_system_log_page(

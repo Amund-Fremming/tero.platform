@@ -11,7 +11,7 @@ use crate::{
         error::ServerError,
         game_base::GameBase,
         system_log::{LogAction, LogCeverity},
-    }, service::{cache::GustCache, key_vault::KeyVault, system_log_builder::SystemLogBuilder}
+    }, service::{cache::GustCache, key_vault::KeyVault, popup_manager::{PagedResponse, PopupManager}, system_log_builder::SystemLogBuilder}
 };
 
 #[derive(Clone)]
