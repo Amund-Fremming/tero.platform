@@ -2,20 +2,18 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    models::{
+    config::config::CONFIG, models::{
         error::ServerError,
         system_log::{
             LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
         },
-    }, service::popup_manager::PagedResponse,
+    }, service::popup_manager::PagedResponse
 };
 
 pub async fn get_system_log_page(
     pool: &Pool<Postgres>,
     request: SyslogPageQuery,
 ) -> Result<PagedResponse<SystemLog>, sqlx::Error> {
-    /* Should be fixed in mac */
-    /*
     let page_size = CONFIG.server.page_size as u16;
     let offset = (page_size * request.page_num.unwrap_or(0)) as i64;
     let limit = (page_size + 1) as i64;
@@ -77,8 +75,6 @@ pub async fn get_system_log_page(
     let page = PagedResponse::new(items, has_next);
 
     Ok(page)
-    */
-    return Err(sqlx::Error::BeginFailed);
 }
 
 pub async fn create_system_log(

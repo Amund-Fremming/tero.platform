@@ -129,6 +129,8 @@
 - [x] Cascades
 - [x] Use compile time checks with query macros 
 
+- [ ] Go over log ceverities, only critical should be the utter most bad shit, like buffer overlfow.
+- [ ] rename file name to funciton name in all platform and in sessino
 - [ ] delete user needs to delete auth0 user also
 
 - [ ] Error handling for client, game full/game does not exist ..
