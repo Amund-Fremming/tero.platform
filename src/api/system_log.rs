@@ -85,8 +85,8 @@ async fn create_system_log(
         builder = builder.metadata(metadata);
     }
 
-    if let Some(file_name) = request.file_name {
-        builder = builder.function(&file_name);
+    if let Some(function) = request.function {
+        builder = builder.function(&function);
     }
 
     builder.log_async();

@@ -17,7 +17,7 @@ pub struct SystemLogBuilder {
     pub subject_type: Option<SubjectType>,
     pub action: Option<LogAction>,
     pub ceverity: Option<LogCeverity>,
-    pub file_name: Option<String>,
+    pub function: Option<String>,
     pub description: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
@@ -30,7 +30,7 @@ impl SystemLogBuilder {
             subject_type: None,
             action: None,
             ceverity: None,
-            file_name: None,
+            function: None,
             description: None,
             metadata: None,
         }
@@ -58,7 +58,7 @@ impl SystemLogBuilder {
     }
 
     pub fn function(mut self, function_name: &str) -> Self {
-        self.file_name = Some(function_name.into());
+        self.function = Some(function_name.into());
         self
     }
 
@@ -89,7 +89,7 @@ impl SystemLogBuilder {
 
         let action = self.action.unwrap_or_else(|| LogAction::Other);
         let ceverity = self.ceverity.unwrap_or_else(|| LogCeverity::Info);
-        let file_name = self.file_name.unwrap_or_else(|| "Not specified".into());
+        let function = self.function.unwrap_or_else(|| "Not specified".into());
 
         create_system_log(
             &self.pool,
@@ -97,7 +97,7 @@ impl SystemLogBuilder {
             &subject_type,
             &action,
             &ceverity,
-            &file_name,
+            &function,
             &description,
             &self.metadata,
         )

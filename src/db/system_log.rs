@@ -2,12 +2,14 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    config::config::CONFIG, models::{
+    config::config::CONFIG,
+    models::{
         error::ServerError,
         system_log::{
             LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
         },
-    }, service::popup_manager::PagedResponse
+    },
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn get_system_log_page(
@@ -25,7 +27,7 @@ pub async fn get_system_log_page(
             subject_type,
             action,
             ceverity,
-            file_name,
+            function,
             description,
             metadata,
             created_at
@@ -60,8 +62,6 @@ pub async fn get_system_log_page(
         limit, offset
     ));
 
-    println!("{}", query);
-
     let logs = sqlx::query_as::<_, SystemLog>(&query)
         .fetch_all(pool)
         .await?;
@@ -69,7 +69,7 @@ pub async fn get_system_log_page(
     let has_next = logs.len() >= page_size as usize;
     let mut items = logs;
     if has_next {
-        items.truncate(page_size as usize);
+        items.pop();
     }
 
     let page = PagedResponse::new(items, has_next);
@@ -83,7 +83,7 @@ pub async fn create_system_log(
     subject_type: &SubjectType,
     action: &LogAction,
     ceverity: &LogCeverity,
-    file_name: &str,
+    function: &str,
     description: &str,
     metadata: &Option<serde_json::Value>,
 ) -> Result<(), ServerError> {
@@ -97,7 +97,7 @@ pub async fn create_system_log(
         subject_type as _,
         action as _,
         ceverity as _,
-        file_name,
+        function,
         description,
         metadata as _,
         created_at

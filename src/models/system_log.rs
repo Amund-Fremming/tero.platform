@@ -10,7 +10,7 @@ pub struct SystemLog {
     pub subject_type: SubjectType,
     pub action: LogAction,
     pub ceverity: LogCeverity,
-    pub file_name: String,
+    pub function: String,
     pub description: String,
     pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
@@ -93,7 +93,7 @@ pub struct CreateSyslogRequest {
     pub action: Option<LogAction>,
     pub ceverity: Option<LogCeverity>,
     pub description: Option<String>,
-    pub file_name: Option<String>,
+    pub function: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
 

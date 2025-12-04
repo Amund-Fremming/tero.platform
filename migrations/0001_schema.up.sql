@@ -54,6 +54,14 @@ CREATE TABLE "saved_game" (
     UNIQUE ("base_id", "user_id")
 );
 
+CREATE TABLE "game_tip" (
+    "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    "header" VARCHAR(100) NOT NULL,
+    "mobile_phone" VARCHAR(20) NOT NULL,
+    "description" VARCHAR(500) NOT NULL,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE "system_log" (
     "id" BIGSERIAL PRIMARY KEY,
     "subject_id" VARCHAR(100) NOT NULL,
@@ -126,6 +134,8 @@ CREATE INDEX "idx_saved_game_id" ON "saved_game" ("id");
 CREATE INDEX "idx_saved_game_delete_keys" ON "saved_game" ("id", "user_id");
 
 CREATE INDEX "idx_system_log_ceverity" ON "system_log" ("ceverity", "created_at" DESC);
+
+CREATE INDEX "idx_game_tip_created_at" ON "game_tip" ("created_at" DESC);
 
 CREATE INDEX "idx_integration_subject" ON "integration" ("subject");
 
