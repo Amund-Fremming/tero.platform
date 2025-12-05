@@ -101,3 +101,9 @@ pub struct CreateGameRequest {
     pub description: Option<String>,
     pub category: Option<GameCategory>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitiateGameRequest {
+    pub key: String,
+    pub value: serde_json::Value,
+}

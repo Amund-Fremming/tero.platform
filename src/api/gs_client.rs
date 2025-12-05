@@ -1,8 +1,8 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::{debug, error};
 
-use crate::models::game_base::{GameType};
+use crate::models::game_base::{GameType, InitiateGameRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GSClientError {
@@ -40,7 +40,7 @@ impl GSClient {
     }
 
     pub async fn health_check(&self, client: &Client) -> Result<(), GSClientError> {
-        let response = client.get(format!("{}health", self.domain)).send().await?;
+        let response = client.get(format!("{}/health", self.domain)).send().await?;
         if !response.status().is_success() {
             return Err(GSClientError::ApiError(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -55,11 +55,17 @@ impl GSClient {
         &self,
         client: &Client,
         game_type: &GameType,
-        key: &str,
-        session: impl Serialize,
+        key: String,
+        value: serde_json::Value,
     ) -> Result<(), GSClientError> {
-        let uri = format!("{}session/initiate/{}/{}", self.domain, game_type.column_name(), key);
-        self.send_json(client, &uri, session).await
+        let uri = format!("session/initiate/{}", game_type.column_name(),);
+        let payload = InitiateGameRequest { key, value };
+
+        // Debug: show the actual JSON that will be sent
+        let json_str = serde_json::to_string_pretty(&payload)?;
+        debug!("Serialized JSON payload:\n{}", json_str);
+
+        self.send_json(client, &uri, payload).await
     }
 
     async fn send_json<T: Serialize>(
@@ -68,7 +74,7 @@ impl GSClient {
         uri: &str,
         body: T,
     ) -> Result<(), GSClientError> {
-        info!("GSClient sending request to: {}", uri);
+        debug!("GSClient sending request to: {}", uri);
         let url = format!("{}/{}", self.domain, uri);
         let response = client
             .post(&url)

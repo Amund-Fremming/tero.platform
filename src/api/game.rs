@@ -12,7 +12,9 @@ use uuid::Uuid;
 use tracing::{debug, error};
 
 use crate::{
-    api::gs_client::InteractiveGameResponse, config::config::CONFIG, db::{
+    api::gs_client::InteractiveGameResponse,
+    config::config::CONFIG,
+    db::{
         self,
         game_base::{
             delete_saved_game, get_game_page, get_saved_games_page, increment_times_played,
@@ -20,7 +22,8 @@ use crate::{
         },
         quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
         spin_game::{get_spin_session_by_game_id, tx_persist_spin_session},
-    }, models::{
+    },
+    models::{
         app_state::AppState,
         auth::Claims,
         error::ServerError,
@@ -31,7 +34,7 @@ use crate::{
         quiz_game::QuizSession,
         spin_game::SpinSession,
         user::{Permission, SubjectId},
-    }
+    },
 };
 
 ///
@@ -62,7 +65,10 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     let interactive_routes = Router::new()
-        .route("/persist/{game_type}/{game_key}", post(persist_interactive_game))
+        .route(
+            "/persist/{game_type}/{game_key}",
+            post(persist_interactive_game),
+        )
         .route(
             "/{game_type}/initiate/{game_id}",
             post(initiate_interactive_game),
@@ -142,10 +148,8 @@ async fn create_interactive_game(
     Json(request): Json<CreateGameRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     // REMOVE
-    debug!(
-        "Recieved request: {}",
-        serde_json::to_string_pretty(&request).unwrap()
-    );
+    dbg!(&request);
+
     let user_id = match subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
         _ => return Err(ServerError::AccessDenied),
@@ -155,7 +159,6 @@ async fn create_interactive_game(
     let gs_client = state.get_gs_client();
     let vault = state.get_vault();
     let pool = state.get_pool();
-
 
     let payload = match game_type {
         GameType::Spin => {
@@ -169,11 +172,10 @@ async fn create_interactive_game(
     };
 
     let game_key = vault.create_key(pool)?;
-    let envelope = InteractiveEnvelope {
-        payload,
-    };
 
-    gs_client.initiate_game_session(client, &game_type, &game_key,  &envelope).await?;
+    gs_client
+        .initiate_game_session(client, &game_type, game_key.clone(), payload)
+        .await?;
 
     let hub_address = format!(
         "{}/hubs/{}",
@@ -231,8 +233,7 @@ async fn initiate_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-
-    let payload = match game_type {
+    let value = match game_type {
         GameType::Spin => {
             let session = get_spin_session_by_game_id(pool, user_id, game_id).await?;
             session.to_json_value()?
@@ -246,11 +247,10 @@ async fn initiate_interactive_game(
     };
 
     let game_key = vault.create_key(pool)?;
-    let envelope = InteractiveEnvelope {
-        payload,
-    };
 
-    gs_client.initiate_game_session(client, &game_type, &game_key, &envelope).await?;
+    gs_client
+        .initiate_game_session(client, &game_type, game_key.clone(), value)
+        .await?;
 
     let hub_address = format!(
         "{}/hubs/{}",

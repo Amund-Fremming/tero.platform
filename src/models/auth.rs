@@ -24,7 +24,7 @@ pub struct Jwk {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     gty: Option<String>,
-    aud: String,
+    aud: Vec<String>,
     azp: String,
     exp: i32,
     iat: i32,
@@ -38,7 +38,7 @@ impl Claims {
     pub fn empty() -> Self {
         Self {
             gty: None,
-            aud: String::new(),
+            aud: Vec::new(),
             azp: String::new(),
             exp: 0,
             iat: 0,
@@ -67,8 +67,9 @@ impl Claims {
             Some(perm) => perm,
         };
 
-        let missing: HashSet<Permission> =
-            required_iter.filter(|p| !permissions.contains(p)).collect();
+        let missing: HashSet<Permission> = required_iter
+            .filter(|p: &Permission| !permissions.contains(p))
+            .collect();
 
         (!missing.is_empty()).then_some(missing)
     }
