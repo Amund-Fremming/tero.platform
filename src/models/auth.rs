@@ -21,9 +21,26 @@ pub struct Jwk {
     pub use_: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum StringOrVec {
+    String(String),
+    Vec(Vec<String>),
+}
+
+impl From<StringOrVec> for Vec<String> {
+    fn from(value: StringOrVec) -> Self {
+        match value {
+            StringOrVec::String(s) => vec![s],
+            StringOrVec::Vec(v) => v,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     gty: Option<String>,
+    #[serde(deserialize_with = "deserialize_aud")]
     aud: Vec<String>,
     azp: String,
     exp: i32,
@@ -32,6 +49,13 @@ pub struct Claims {
     pub scope: String,
     pub sub: String,
     pub permissions: Option<HashSet<Permission>>,
+}
+
+fn deserialize_aud<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    StringOrVec::deserialize(deserializer).map(Into::into)
 }
 
 impl Claims {

@@ -128,6 +128,12 @@ async fn join_interactive_game(
         ));
     }
 
+    /*
+            TODO
+                - Make it so get key also returns the gametype
+                - remove game_type from params
+    */
+
     let hub_address = format!(
         "{}hubs/{}",
         CONFIG.server.gs_domain,
