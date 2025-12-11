@@ -12,7 +12,7 @@ use uuid::Uuid;
 use tracing::{debug, error};
 
 use crate::{
-    api::gs_client::InteractiveGameResponse,
+    api::gs_client::{InteractiveGameResponse, JoinGameResponse},
     config::config::CONFIG,
     db::{
         self,
@@ -73,7 +73,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             "/{game_type}/initiate/{game_id}",
             post(initiate_interactive_game),
         )
-        .route("/{game_type}/join/{game_id}", post(join_interactive_game))
+        .route("/join/{game_id}", post(join_interactive_game))
         .with_state(state.clone());
 
     Router::new()
@@ -103,7 +103,7 @@ async fn delete_game(
 async fn join_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Path((game_type, key_word)): Path<(GameType, String)>,
+    Path(key_word): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
         error!("Integration {} tried accessing user endpoint", id);
@@ -121,27 +121,22 @@ async fn join_interactive_game(
         }
     };
 
-    if !state.get_vault().key_active(&tuple) {
+    let Some(game_type) = state.get_vault().key_active(&tuple) else {
         return Err(ServerError::Api(
             StatusCode::NOT_FOUND,
             "Game with game key does not exist".into(),
         ));
-    }
-
-    /*
-            TODO
-                - Make it so get key also returns the gametype
-                - remove game_type from params
-    */
+    };
 
     let hub_address = format!(
-        "{}hubs/{}",
+        "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.column_name()
+        game_type.clone().column_name()
     );
-    let response = InteractiveGameResponse {
+    let response = JoinGameResponse {
         game_key: key_word,
         hub_address,
+        game_type,
     };
 
     Ok((StatusCode::OK, Json(response)))
@@ -177,7 +172,7 @@ async fn create_interactive_game(
         }
     };
 
-    let game_key = vault.create_key(pool)?;
+    let game_key = vault.create_key(pool, game_type.clone())?;
 
     gs_client
         .initiate_game_session(client, &game_type, game_key.clone(), payload)
@@ -252,7 +247,7 @@ async fn initiate_interactive_game(
         }
     };
 
-    let game_key = vault.create_key(pool)?;
+    let game_key = vault.create_key(pool, game_type.clone())?;
 
     gs_client
         .initiate_game_session(client, &game_type, game_key.clone(), value)

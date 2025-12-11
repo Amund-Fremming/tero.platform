@@ -4,7 +4,10 @@ mod tests {
 
     use dotenv::dotenv;
 
-    use crate::{models::app_state::AppState, service::key_vault::KeyVaultError};
+    use crate::{
+        models::{app_state::AppState, game_base::GameType},
+        service::key_vault::KeyVaultError,
+    };
 
     async fn setup_app_state() -> Arc<AppState> {
         dotenv().ok();
@@ -22,11 +25,11 @@ mod tests {
         let vault = state.get_vault();
 
         for num in 0..10_000 {
-            let word = vault.create_key(state.get_pool()).unwrap();
+            let word = vault.create_key(state.get_pool(), GameType::Quiz).unwrap();
             println!("{} - {}", num + 1, word)
         }
 
-        let result = vault.create_key(state.get_pool());
+        let result = vault.create_key(state.get_pool(), GameType::Quiz);
         assert!(result.is_err());
 
         let error = result.err().unwrap();
@@ -47,7 +50,7 @@ mod tests {
 
             let handle = tokio::spawn(async move {
                 let vault = state_clone.get_vault();
-                match vault.create_key(state_clone.get_pool()) {
+                match vault.create_key(state_clone.get_pool(), GameType::Quiz) {
                     Ok(key) => {
                         println!("Task {} opprettet nøkkel: {}", i, key);
                         Ok(key)

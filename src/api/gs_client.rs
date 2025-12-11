@@ -28,6 +28,13 @@ pub struct InteractiveGameResponse {
     pub hub_address: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JoinGameResponse {
+    pub game_key: String,
+    pub hub_address: String,
+    pub game_type: GameType,
+}
+
 #[derive(Debug, Clone)]
 pub struct GSClient {
     domain: String,

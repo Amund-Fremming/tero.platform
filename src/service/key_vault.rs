@@ -12,7 +12,10 @@ use tracing::{debug, error};
 
 use crate::{
     db::key_vault::get_word_sets,
-    models::system_log::{LogAction, LogCeverity},
+    models::{
+        game_base::GameType,
+        system_log::{LogAction, LogCeverity},
+    },
     service::system_log_builder::SystemLogBuilder,
 };
 
@@ -31,9 +34,15 @@ pub enum KeyVaultError {
     TimeError(#[from] SystemTimeError),
 }
 
+#[derive(Debug)]
+pub struct VaultValue {
+    timestamp: u64,
+    game_type: GameType,
+}
+
 pub struct KeyVault {
     word_count: u8,
-    active_keys: Arc<DashMap<(String, String), u64>>,
+    active_keys: Arc<DashMap<(String, String), VaultValue>>,
     prefix_words: Arc<Vec<String>>,
     suffix_words: Arc<Vec<String>>,
 }
@@ -57,8 +66,11 @@ impl KeyVault {
         Ok(vault)
     }
 
-    pub fn key_active(&self, key: &(String, String)) -> bool {
-        self.active_keys.contains_key(&key)
+    pub fn key_active(&self, key: &(String, String)) -> Option<GameType> {
+        match self.active_keys.get(key) {
+            Some(value) => Some(value.game_type.clone()),
+            None => None,
+        }
     }
 
     pub fn remove_key(&self, key: (String, String)) {
@@ -73,7 +85,11 @@ impl KeyVault {
         Ok((prefix_idx, suffix_idx))
     }
 
-    pub fn create_key(&self, pool: &Pool<Postgres>) -> Result<String, KeyVaultError> {
+    pub fn create_key(
+        &self,
+        pool: &Pool<Postgres>,
+        game_type: GameType,
+    ) -> Result<String, KeyVaultError> {
         for _ in 0..100 {
             let Ok((idx1, idx2)) = self.random_idx() else {
                 break; // Log outside loop
@@ -84,12 +100,17 @@ impl KeyVault {
                 self.suffix_words[idx2].clone(),
             );
 
-            if self.key_active(&key) {
+            if self.active_keys.contains_key(&key) {
                 continue;
             }
 
-            let created_at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-            self.active_keys.insert(key.clone(), created_at);
+            let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            let value = VaultValue {
+                timestamp,
+                game_type,
+            };
+
+            self.active_keys.insert(key.clone(), value);
             return Ok(format!("{} {}", key.0, key.1));
         }
 
@@ -97,12 +118,17 @@ impl KeyVault {
             for j in 0..self.suffix_words.len() {
                 let key = (self.prefix_words[i].clone(), self.suffix_words[j].clone());
 
-                if self.key_active(&key) {
+                if self.active_keys.contains_key(&key) {
                     continue;
                 }
 
-                let created_at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-                self.active_keys.insert(key.clone(), created_at);
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+                let value = VaultValue {
+                    timestamp,
+                    game_type,
+                };
+
+                self.active_keys.insert(key.clone(), value);
                 return Ok(format!("{} {}", key.0, key.1));
             }
         }
@@ -141,7 +167,9 @@ impl KeyVault {
 
                 let keys_before = active_keys.len();
                 let timeout_threshold = time.as_secs() - 3600;
-                active_keys.retain(|_, &mut created_at| created_at > timeout_threshold);
+
+                active_keys.retain(|_, value| value.timestamp > timeout_threshold);
+
                 let keys_after = active_keys.len();
                 let removed_keys = keys_before - keys_after;
 
