@@ -64,7 +64,14 @@ pub enum GameType {
 }
 
 impl GameType {
-    pub fn column_name(&self) -> &'static str {
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            GameType::Quiz => "quiz_game",
+            GameType::Spin => "spin_game",
+        }
+    }
+
+    pub fn short_name(&self) -> &'static str {
         match self {
             GameType::Quiz => "quiz",
             GameType::Spin => "spin",

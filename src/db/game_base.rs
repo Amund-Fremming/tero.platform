@@ -56,7 +56,7 @@ pub async fn get_game_page(
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
-        request.game_type.column_name(),
+        request.game_type.short_name(),
         category,
         limit,
         offset
@@ -84,7 +84,7 @@ pub async fn increment_times_played(
         SET times_played = times_played + 1, last_played = $1
         WHERE id = $2
         "#,
-        game_type.column_name()
+        game_type.table_name()
     );
 
     let row = sqlx::query(&query)
@@ -111,7 +111,7 @@ pub async fn delete_game(
         DELETE FROM {}
         WHERE id = $1
         "#,
-        game_type.column_name()
+        game_type.table_name()
     );
 
     let row = sqlx::query(&query).bind(id).execute(pool).await?;

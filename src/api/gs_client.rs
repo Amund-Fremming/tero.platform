@@ -65,7 +65,7 @@ impl GSClient {
         key: String,
         value: serde_json::Value,
     ) -> Result<(), GSClientError> {
-        let uri = format!("session/initiate/{}", game_type.column_name(),);
+        let uri = format!("session/initiate/{}", game_type.short_name(),);
         let payload = InitiateGameRequest { key, value };
 
         // Debug: show the actual JSON that will be sent

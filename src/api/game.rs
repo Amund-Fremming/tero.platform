@@ -131,7 +131,7 @@ async fn join_interactive_game(
     let hub_address = format!(
         "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.clone().column_name()
+        game_type.clone().short_name()
     );
     let response = JoinGameResponse {
         game_key: key_word,
@@ -181,7 +181,7 @@ async fn create_interactive_game(
     let hub_address = format!(
         "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.column_name()
+        game_type.short_name()
     );
 
     let response = InteractiveGameResponse {
@@ -256,7 +256,7 @@ async fn initiate_interactive_game(
     let hub_address = format!(
         "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.column_name()
+        game_type.short_name()
     );
 
     let response = InteractiveGameResponse {
@@ -361,13 +361,13 @@ async fn persist_interactive_game(
             let session: QuizSession = serde_json::from_value(request.payload)?;
             match session.times_played {
                 0 => {
+                    println!("Holla 1");
                     let mut tx = pool.begin().await?;
                     tx_persist_quiz_session(&mut tx, &session).await?;
                     tx.commit().await?;
                 }
                 _ => increment_times_played(pool, GameType::Quiz, session.base_id).await?,
             }
-            increment_times_played(pool, GameType::Quiz, session.quiz_id).await?;
         }
     }
 
