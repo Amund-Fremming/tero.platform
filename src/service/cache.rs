@@ -91,7 +91,7 @@ impl<T: Clone + Send + Sync> GustCache<T> {
         let interval = time::Duration::from_secs(interval_seconds);
 
         let cache_pointer = self.cache.clone();
-        let offset = self.ttl.clone();
+        let offset = self.ttl;
 
         let mut ticker = tokio::time::interval(interval);
         self.cleanup_task = Some(tokio::spawn(async move {

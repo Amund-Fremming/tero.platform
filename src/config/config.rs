@@ -73,10 +73,7 @@ impl AppConfig {
         };
 
         let config: AppConfig = Config::builder()
-            .add_source(File::with_name(&format!(
-                "src/config/{}.toml",
-                runtime.to_string()
-            )))
+            .add_source(File::with_name(&format!("src/config/{}.toml", runtime)))
             .add_source(Environment::with_prefix("TERO").separator("__"))
             .build()?
             .try_deserialize()?;

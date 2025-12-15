@@ -30,11 +30,7 @@ async fn health_detailed(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, ServerError> {
     let platform = true;
-
-    let db_status = match db::health::health_check(state.get_pool()).await {
-        Ok(_) => true,
-        Err(_) => false,
-    };
+    let db_status = db::health::health_check(state.get_pool()).await.is_ok();
 
     let session_status = match state.get_gs_client().health_check(state.get_client()).await {
         Ok(_) => true,

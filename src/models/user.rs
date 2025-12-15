@@ -50,6 +50,7 @@ pub struct Auth0User {
     pub family_name: Option<String>,
 }
 
+#[allow(dead_code)] // TODO
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "user_type", rename_all = "lowercase")]
 pub enum UserType {
@@ -60,6 +61,7 @@ pub enum UserType {
     Admin,
 }
 
+#[allow(dead_code)] // TODO
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PseudoUser {
     pub id: Uuid,

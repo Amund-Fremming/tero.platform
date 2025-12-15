@@ -58,8 +58,8 @@ impl KeyVault {
         let vault = Self {
             word_count: db_prefix.len() as u8,
             active_keys: Arc::new(DashMap::new()),
-            prefix_words: Arc::new(Vec::from(db_prefix)),
-            suffix_words: Arc::new(Vec::from(db_suffix)),
+            prefix_words: Arc::new(db_prefix),
+            suffix_words: Arc::new(db_suffix),
         };
 
         vault.spawn_vault_cleanup(pool);

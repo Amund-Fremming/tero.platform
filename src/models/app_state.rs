@@ -6,12 +6,21 @@ use reqwest::Client;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    api::gs_client::GSClient, config::config::CONFIG, db::game_base::delete_non_active_games, models::{
+    api::gs_client::GSClient,
+    config::config::CONFIG,
+    db::game_base::delete_non_active_games,
+    models::{
         auth::Jwks,
         error::ServerError,
         game_base::GameBase,
         system_log::{LogAction, LogCeverity},
-    }, service::{cache::GustCache, key_vault::KeyVault, popup_manager::{PagedResponse, PopupManager}, system_log_builder::SystemLogBuilder}
+    },
+    service::{
+        cache::GustCache,
+        key_vault::KeyVault,
+        popup_manager::{PagedResponse, PopupManager},
+        system_log_builder::SystemLogBuilder,
+    },
 };
 
 #[derive(Clone)]
@@ -27,7 +36,7 @@ pub struct AppState {
 
 impl AppState {
     pub async fn from_connection_string(connection_string: &str) -> Result<Arc<Self>, ServerError> {
-        let pool = Pool::<Postgres>::connect(&connection_string).await?;
+        let pool = Pool::<Postgres>::connect(connection_string).await?;
         let client = Client::new();
         let gs_client = GSClient::new(&CONFIG.server.gs_domain);
 

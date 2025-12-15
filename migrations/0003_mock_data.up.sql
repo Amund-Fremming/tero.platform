@@ -3,6 +3,8 @@
 -- CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+insert into "integration" ("subject", "name") values ('NmMLjTtX0XrnWjbe1JbRAgwEmn5lP3Sg@clients', 'session');
+
 INSERT INTO "game_base" (
     id,
     name,

@@ -87,9 +87,9 @@ impl SystemLogBuilder {
             description = format!("{}...", &description[..509]);
         }
 
-        let action = self.action.unwrap_or_else(|| LogAction::Other);
-        let ceverity = self.ceverity.unwrap_or_else(|| LogCeverity::Info);
-        let function = self.function.unwrap_or_else(|| "Not specified".into());
+        let action = self.action.unwrap_or(LogAction::Other);
+        let ceverity = self.ceverity.unwrap_or(LogCeverity::Info);
+        let function = self.function.unwrap_or("Not specified".into());
 
         create_system_log(
             &self.pool,

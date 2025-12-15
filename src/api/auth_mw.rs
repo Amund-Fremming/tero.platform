@@ -121,7 +121,7 @@ async fn handle_token_header(
     request.extensions_mut().insert(claims);
     request.extensions_mut().insert(subject);
 
-    return Ok(());
+    Ok(())
 }
 
 // Warning: 65% AI generated code

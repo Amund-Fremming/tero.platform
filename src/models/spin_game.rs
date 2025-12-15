@@ -58,7 +58,7 @@ impl SpinSession {
             host_id: user_id,
             name: request.name,
             description: request.description,
-            category: request.category.unwrap_or_else(|| GameCategory::Default),
+            category: request.category.unwrap_or(GameCategory::Default),
             iterations: 0,
             times_played: 0,
             last_played: Utc::now(),

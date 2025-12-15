@@ -13,12 +13,12 @@ mod tests {
         dotenv().ok();
         let connection_string =
             env::var("TERO__DATABASE_URL").expect("Failed to obtain connection string");
-        let state = AppState::from_connection_string(&connection_string)
+        AppState::from_connection_string(&connection_string)
             .await
-            .unwrap();
-        state
+            .unwrap()
     }
 
+    #[allow(clippy::assertions_on_constants)]
     #[tokio::test]
     async fn max_limit_keys() {
         let state = setup_app_state().await;
@@ -35,7 +35,7 @@ mod tests {
         let error = result.err().unwrap();
         match error {
             KeyVaultError::FullCapasity => assert!(true),
-            _ => assert!(false, "Failed with: {}", error.to_string()),
+            _ => assert!(false, "Failed with: {}", error),
         }
     }
 
@@ -93,7 +93,7 @@ mod tests {
             );
         }
 
-        assert!(successful_keys.len() > 0, "Ingen nøkler ble opprettet");
+        assert!(successful_keys.is_empty(), "Ingen nøkler ble opprettet");
         assert_eq!(
             successful_keys.len(),
             unique_keys.len(),

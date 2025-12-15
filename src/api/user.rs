@@ -105,14 +105,15 @@ async fn ensure_pseudo_user(
     let pool = state.get_pool().clone();
     tokio::spawn(async move {
         if let Err(e) = update_pseudo_user_activity(&pool, pseudo_id).await {
-            let _ = state
+            _ = state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
                 .function("ensure_pseudo_user")
                 .description("Failed to update pseudo user activity")
                 .metadata(json!({"error": e.to_string()}))
-                .log();
+                .log()
+                .await;
         };
     });
 
@@ -159,7 +160,10 @@ async fn delete_user(
         return Err(ServerError::AccessDenied);
     };
 
-    if let None = claims.missing_permission([Permission::WriteAdmin]) {
+    if claims
+        .missing_permission([Permission::WriteAdmin])
+        .is_none()
+    {
         delete_base_user_by_id(state.get_pool(), &user_id).await?;
         return Ok(StatusCode::OK);
     }
@@ -211,26 +215,26 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
         let pool = pool.clone();
         let subject_id = subject_id.clone();
 
-        let base_user = match get_base_user_by_id(&pool, pseudo_id).await {
-            Ok(option) => option,
+        match get_base_user_by_id(&pool, pseudo_id).await {
+            Ok(option) if option.is_some() => {
+                debug!("Base user exists for pseudo user, skipping cleanup");
+                return;
+            }
             Err(e) => {
-                let _ = SystemLogBuilder::new(&pool)
+                _ = SystemLogBuilder::new(&pool)
                     .action(LogAction::Read)
                     .ceverity(LogCeverity::Warning)
                     .function("cleanup_subject_pseudo_id")
                     .description("Failed to fetch base user for pseudo user cleanup")
                     .subject(subject_id)
                     .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
-                    .log();
+                    .log()
+                    .await;
 
                 return;
             }
+            _ => {}
         };
-
-        if let Some(_) = base_user {
-            debug!("Base user exists for pseudo user, skipping cleanup");
-            return;
-        }
 
         let (deleted, error) = match delete_pseudo_user(&pool, pseudo_id).await {
             Ok(deleted) => (deleted, "no error".to_string()),
@@ -238,14 +242,15 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
         };
 
         if !deleted {
-            let _ = SystemLogBuilder::new(&pool)
+            _ = SystemLogBuilder::new(&pool)
                 .action(LogAction::Read)
                 .ceverity(LogCeverity::Critical)
                 .function("cleanup_subject_pseudo_id")
                 .description("Failed to fetch base user for pseudo user cleanup")
                 .subject(subject_id)
                 .metadata(json!({"pseudo_user_id": pseudo_id, "error": error}))
-                .log();
+                .log()
+                .await;
         }
     });
 }

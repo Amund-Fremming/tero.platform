@@ -43,8 +43,6 @@ use crate::{
 ///     in the creation of the game. But then the game is a standalone game.
 ///     An example would be quiz, quiz is interactive on creation by adding
 ///     questions but standalone when playing.
-///
-
 pub fn game_routes(state: Arc<AppState>) -> Router {
     let generic_routes = Router::new()
         .route("/page", post(get_games))
@@ -111,7 +109,7 @@ async fn join_interactive_game(
     }
 
     let words: Vec<&str> = key_word.split(" ").collect();
-    let tuple = match (words.get(0), words.get(1)) {
+    let tuple = match (words.first(), words.get(1)) {
         (Some(p), Some(s)) => (p.to_string(), s.to_string()),
         _ => {
             return Err(ServerError::Api(
@@ -212,11 +210,11 @@ async fn initiate_standalone_game(
     };
 
     let envelope = StandaloneEnvelope {
-        game_type: game_type,
+        game_type,
         payload: value,
     };
 
-    return Ok((StatusCode::OK, Json(envelope)));
+    Ok((StatusCode::OK, Json(envelope)))
 }
 
 async fn initiate_interactive_game(
@@ -332,7 +330,7 @@ async fn persist_interactive_game(
     }
 
     let words: Vec<&str> = game_key.split(" ").collect();
-    let tuple = match (words.get(0), words.get(1)) {
+    let tuple = match (words.first(), words.get(1)) {
         (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
         _ => {
             return Err(ServerError::Api(
@@ -361,7 +359,6 @@ async fn persist_interactive_game(
             let session: QuizSession = serde_json::from_value(request.payload)?;
             match session.times_played {
                 0 => {
-                    println!("Holla 1");
                     let mut tx = pool.begin().await?;
                     tx_persist_quiz_session(&mut tx, &session).await?;
                     tx.commit().await?;
@@ -371,7 +368,7 @@ async fn persist_interactive_game(
         }
     }
 
-    return Ok(StatusCode::CREATED);
+    Ok(StatusCode::CREATED)
 }
 
 async fn free_game_key(
@@ -390,7 +387,7 @@ async fn free_game_key(
     }
 
     let words: Vec<&str> = key_word.split(" ").collect();
-    let tuple = match (words.get(0), words.get(1)) {
+    let tuple = match (words.first(), words.get(1)) {
         (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
         _ => {
             return Err(ServerError::Api(

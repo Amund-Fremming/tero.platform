@@ -205,7 +205,7 @@ pub async fn get_saved_games_page(
     );
 
     let games = sqlx::query_as::<_, GameBase>(&query)
-        .bind(&user_id)
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
 
