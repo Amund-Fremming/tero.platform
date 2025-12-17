@@ -274,13 +274,16 @@ async fn get_games(
         return Err(ServerError::AccessDenied);
     }
 
-    let pool = state.get_pool();
+    // TODO - add back caching: it has a issue not displaying new entries
+    /*
     let cache = state.get_cache();
 
     let page = cache
         .get_or(&request, || get_game_page(pool, &request))
         .await?;
+    */
 
+    let page = get_game_page(state.get_pool(), &request).await?;
     Ok((StatusCode::OK, Json(page)))
 }
 
@@ -325,6 +328,10 @@ async fn persist_interactive_game(
         return Err(ServerError::AccessDenied);
     };
 
+    dbg!("game_type: ", &game_type);
+    dbg!("game_key: ", &game_key);
+    dbg!("Persist request payload", &request.payload);
+
     if let Some(missing) = claims.missing_permission([Permission::WriteGame]) {
         return Err(ServerError::Permission(missing));
     }
@@ -357,6 +364,7 @@ async fn persist_interactive_game(
         }
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
+            dbg!("Serialized session payload. {}", &session); // TODO remove
             match session.times_played {
                 0 => {
                     let mut tx = pool.begin().await?;
