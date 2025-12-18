@@ -29,7 +29,7 @@ use crate::{
         error::ServerError,
         game_base::{
             CreateGameRequest, GameConverter, GamePageQuery, GameType, InteractiveEnvelope,
-            SavedGamesPageQuery, StandaloneEnvelope,
+            JsonWrapper, SavedGamesPageQuery,
         },
         quiz_game::QuizSession,
         spin_game::SpinSession,
@@ -48,7 +48,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .route("/page", post(get_games))
         .route("/{game_type}/create", post(create_interactive_game))
         .route("/{game_type}/{game_id}", delete(delete_game))
-        .route("/{game_type}/free-key/{key_word}", patch(free_game_key))
+        .route("/free-key/{key_word}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
         .route("/unsave/{game_id}", delete(user_usaved_game))
         .route("/saved", get(get_saved_games))
@@ -146,9 +146,6 @@ async fn create_interactive_game(
     Path(game_type): Path<GameType>,
     Json(request): Json<CreateGameRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
-    // REMOVE
-    dbg!(&request);
-
     let user_id = match subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
         _ => return Err(ServerError::AccessDenied),
@@ -196,10 +193,10 @@ async fn initiate_standalone_game(
     Extension(_subject_id): Extension<SubjectId>,
     Path((game_type, game_id)): Path<(GameType, Uuid)>,
 ) -> Result<impl IntoResponse, ServerError> {
-    let value = match game_type {
+    let wrapper = match game_type {
         GameType::Quiz => {
             let session = get_quiz_session_by_id(state.get_pool(), &game_id).await?;
-            session.to_json_value()?
+            JsonWrapper::QuizWrapper(session)
         }
         _ => {
             return Err(ServerError::Api(
@@ -209,12 +206,7 @@ async fn initiate_standalone_game(
         }
     };
 
-    let envelope = StandaloneEnvelope {
-        game_type,
-        payload: value,
-    };
-
-    Ok((StatusCode::OK, Json(envelope)))
+    Ok((StatusCode::OK, Json(wrapper)))
 }
 
 async fn initiate_interactive_game(

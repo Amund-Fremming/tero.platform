@@ -5,8 +5,17 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::{quiz_game::QuizSession, spin_game::SpinSession};
+
 pub trait GameConverter {
     fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error>;
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum JsonWrapper {
+    QuizWrapper(QuizSession),
+    SpinWrapper(SpinSession),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
@@ -93,12 +102,6 @@ pub struct SavedGamesPageQuery {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InteractiveEnvelope {
-    pub payload: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StandaloneEnvelope {
-    pub game_type: GameType,
     pub payload: serde_json::Value,
 }
 
