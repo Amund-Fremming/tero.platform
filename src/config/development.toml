@@ -7,3 +7,11 @@ page_size = 20
 [auth0]
 domain = "https://dev-tero.eu.auth0.com/"
 audience = "https://api.tero.com"
+
+[[integrations]]
+subject = "auth0|123456"
+name = "auth0"
+
+[[integrations]]
+subject = "session|123456"
+name = "session"

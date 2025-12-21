@@ -5,14 +5,26 @@ use config::{Config, ConfigError, Environment, File};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
+use uuid::Uuid;
+
+use crate::models::integration::IntegrationName;
 
 pub static CONFIG: Lazy<AppConfig> =
     Lazy::new(|| AppConfig::load().unwrap_or_else(|e| panic!("{}", e)));
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Runtime {
     Dev,
     Prod,
+}
+
+impl fmt::Display for Runtime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Runtime::Dev => write!(f, "development"),
+            Runtime::Prod => write!(f, "production"),
+        }
+    }
 }
 
 impl From<String> for Runtime {
@@ -30,6 +42,7 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub auth0: Auth0Config,
     pub database_url: String,
+    pub integrations: Vec<IntegrationConfig>,
 }
 
 fn default_address() -> String {
@@ -63,31 +76,16 @@ pub struct Auth0Config {
     pub webhook_key: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum RunTime {
-    Development,
-    Production,
-}
-
-impl fmt::Display for Runtime {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Runtime::Development => write!(f, "development"),
-            Runtime::Production => write!(f, "production"),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IntegrationConfig {
+    pub id: Uuid,
+    pub subject: String,
+    pub name: IntegrationName,
 }
 
 impl AppConfig {
     fn load() -> Result<Self, ConfigError> {
-        let runtime = match env::var("ENVIRONMENT")
-            .expect("ENVIRONMENT not set")
-            .as_str()
-        {
-            "DEVELOPMENT" => Runtime::Development,
-            "PRODUCTION" => Runtime::Production,
-            _ => panic!("Invalid environment set, must be either `DEVELOPMENT` or ´PRODUCTION´"),
-        };
+        let runtime: Runtime = env::var("ENVIRONMENT").expect("ENVIRONMENT not set").into();
 
         let config: AppConfig = Config::builder()
             .add_source(File::with_name(&format!("src/config/{}.toml", runtime)))

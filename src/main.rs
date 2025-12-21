@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use axum::{Router, middleware::from_fn_with_state, routing::post};
 use dotenv::dotenv;
 use models::app_state::AppState;
-use sqlx::{Pool, Postgres};
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
@@ -19,7 +18,6 @@ use crate::{
         webhook_mw::webhook_mw,
     },
     config::config::CONFIG,
-    db::integration,
     models::{
         error::ServerError,
         integration::{INTEGRATION_IDS, INTEGRATION_NAMES, IntegrationName},
@@ -53,8 +51,8 @@ async fn main() {
     state.spawn_game_cleanup();
 
     // Initiate integrations
-    if let Err(e) = load_integrations(state.get_pool()).await {
-        error!("{}", e);
+    if let Err(e) = load_integrations().await {
+        error!("Failed to load integrations: {}", e);
         return;
     }
 
@@ -99,8 +97,8 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn load_integrations(pool: &Pool<Postgres>) -> Result<(), ServerError> {
-    let integrations = integration::list_integrations(pool).await?;
+async fn load_integrations() -> Result<(), ServerError> {
+    let integrations = &CONFIG.integrations;
 
     let integration_names: HashMap<String, IntegrationName> = integrations
         .iter()

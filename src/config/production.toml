@@ -1,0 +1,12 @@
+[server]
+address = "0.0.0.0"
+port = 3000
+page_size = 20
+
+[[integrations]]
+subject = "auth0|production"
+name = "auth0"
+
+[[integrations]]
+subject = "session|production"
+name = "session"

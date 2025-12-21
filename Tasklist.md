@@ -125,16 +125,14 @@
 - [x] Remove notifications after some time to store data storage
 - [x] endpoint for admins to create alerts
 
----
-
 **SignalR microservice**
 
 - [x] Create C# project with signal installed
-- [ ] Create a http client for talking to rust
-- [ ] Create api in c# for consuming games from rust
-- [ ] Create or add a cache solution for storing game sessions
-- [ ] Create auth0 cached client for getting token from c#
-- [ ] Add core game logic in c# project
+- [x] Create a http client for talking to rust
+- [x] Create api in c# for consuming games from rust
+- [x] Create or add a cache solution for storing game sessions
+- [x] Create auth0 cached client for getting token from c#
+- [x] Add core game logic in c# project
 
 **Cleanup/refactor**
 

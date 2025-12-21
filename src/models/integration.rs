@@ -14,7 +14,6 @@ pub static INTEGRATION_IDS: Lazy<Mutex<HashMap<IntegrationName, Uuid>>> =
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Integration {
-    pub id: Uuid,
     pub subject: String,
     pub name: IntegrationName,
 }
