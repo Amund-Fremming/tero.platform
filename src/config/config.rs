@@ -9,6 +9,22 @@ use tracing::debug;
 pub static CONFIG: Lazy<AppConfig> =
     Lazy::new(|| AppConfig::load().unwrap_or_else(|e| panic!("{}", e)));
 
+#[derive(Serialize, Deserialize)]
+pub enum Runtime {
+    Dev,
+    Prod,
+}
+
+impl From<String> for Runtime {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "DEVELOPMENT" => Runtime::Dev,
+            "PRODUCTION" => Runtime::Prod,
+            _ => Runtime::Prod,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
     pub server: ServerConfig,
@@ -37,6 +53,7 @@ pub struct ServerConfig {
     pub gs_domain: String,
     #[serde(default = "default_page_size")]
     pub page_size: u8,
+    pub runtime: Runtime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,11 +69,11 @@ pub enum RunTime {
     Production,
 }
 
-impl fmt::Display for RunTime {
+impl fmt::Display for Runtime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RunTime::Development => write!(f, "development"),
-            RunTime::Production => write!(f, "production"),
+            Runtime::Development => write!(f, "development"),
+            Runtime::Production => write!(f, "production"),
         }
     }
 }
@@ -67,8 +84,8 @@ impl AppConfig {
             .expect("ENVIRONMENT not set")
             .as_str()
         {
-            "DEVELOPMENT" => RunTime::Development,
-            "PRODUCTION" => RunTime::Production,
+            "DEVELOPMENT" => Runtime::Development,
+            "PRODUCTION" => Runtime::Production,
             _ => panic!("Invalid environment set, must be either `DEVELOPMENT` or ´PRODUCTION´"),
         };
 
