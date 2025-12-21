@@ -146,6 +146,7 @@
 - [x] Cascades
 - [x] Use compile time checks with query macros
 
+- [ ] Cache is broken
 - [ ] Move auth0 id to pseudo user? and rename it to something more generic
   - Could be nice as nullable to know if the pseudo has a registered user
 - [ ] Go over log ceverities, only critical should be the utter most bad shit, like buffer overlfow.
