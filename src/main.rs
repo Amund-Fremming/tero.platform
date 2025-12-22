@@ -5,7 +5,6 @@ use dotenv::dotenv;
 use models::app_state::AppState;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
-use uuid::Uuid;
 
 use crate::{
     api::{
@@ -20,7 +19,7 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        integration::{INTEGRATION_IDS, INTEGRATION_NAMES, IntegrationName},
+        integration::{INTEGRATION_NAMES, IntegrationName},
     },
 };
 
@@ -104,16 +103,6 @@ async fn load_integrations() -> Result<(), ServerError> {
         .iter()
         .map(|i| (i.subject.clone(), i.name.clone()))
         .collect();
-
-    let integration_ids: HashMap<IntegrationName, Uuid> = integrations
-        .iter()
-        .map(|i| (i.name.clone(), i.id))
-        .collect();
-
-    {
-        let mut lock = INTEGRATION_IDS.lock().await;
-        *lock = integration_ids;
-    }
 
     {
         let mut lock = INTEGRATION_NAMES.lock().await;

@@ -9,7 +9,7 @@ use axum::{
 use reqwest::StatusCode;
 use uuid::Uuid;
 
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
@@ -48,7 +48,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .route("/page", post(get_games))
         .route("/{game_type}/create", post(create_interactive_game))
         .route("/{game_type}/{game_id}", delete(delete_game))
-        .route("/free-key/{key_word}", patch(free_game_key))
+        .route("/free-key/{game_key}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
         .route("/unsave/{game_id}", delete(user_usaved_game))
         .route("/saved", get(get_saved_games))
@@ -168,6 +168,7 @@ async fn create_interactive_game(
     };
 
     let game_key = vault.create_key(pool, game_type.clone())?;
+    info!("Created key: {}", game_key);
 
     gs_client
         .initiate_game_session(client, &game_type, game_key.clone(), payload)
@@ -305,6 +306,7 @@ pub async fn persist_standalone_game(
         }
     }
 
+    info!("Persisted standalone game");
     Ok(StatusCode::CREATED)
 }
 
@@ -319,10 +321,6 @@ async fn persist_interactive_game(
         error!("User tried to persist game session");
         return Err(ServerError::AccessDenied);
     };
-
-    dbg!("game_type: ", &game_type);
-    dbg!("game_key: ", &game_key);
-    dbg!("Persist request payload", &request.payload);
 
     if let Some(missing) = claims.missing_permission([Permission::WriteGame]) {
         return Err(ServerError::Permission(missing));
@@ -341,6 +339,7 @@ async fn persist_interactive_game(
 
     state.get_vault().remove_key(tuple);
     let pool = state.get_pool();
+    info!("Removed game key: {}", game_key);
 
     match game_type {
         GameType::Spin => {
@@ -351,23 +350,23 @@ async fn persist_interactive_game(
                     tx_persist_spin_session(&mut tx, &session).await?;
                     tx.commit().await?;
                 }
-                _ => increment_times_played(pool, GameType::Spin, session.base_id).await?,
+                _ => increment_times_played(pool, session.base_id).await?,
             }
         }
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            dbg!("Serialized session payload. {}", &session); // TODO remove
             match session.times_played {
                 0 => {
                     let mut tx = pool.begin().await?;
                     tx_persist_quiz_session(&mut tx, &session).await?;
                     tx.commit().await?;
                 }
-                _ => increment_times_played(pool, GameType::Quiz, session.base_id).await?,
+                _ => increment_times_played(pool, session.base_id).await?,
             }
         }
     }
 
+    info!("Persisted interactive game");
     Ok(StatusCode::CREATED)
 }
 
@@ -375,7 +374,7 @@ async fn free_game_key(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
-    Path(key_word): Path<String>,
+    Path(game_key): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
         error!("User tried to free game keys/word");
@@ -386,7 +385,7 @@ async fn free_game_key(
         return Err(ServerError::Permission(missing));
     }
 
-    let words: Vec<&str> = key_word.split(" ").collect();
+    let words: Vec<&str> = game_key.split(" ").collect();
     let tuple = match (words.first(), words.get(1)) {
         (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
         _ => {
@@ -397,6 +396,7 @@ async fn free_game_key(
         }
     };
 
+    info!("Game key freed: {}", game_key);
     state.get_vault().remove_key(tuple);
     Ok(StatusCode::OK)
 }

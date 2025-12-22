@@ -5,9 +5,8 @@ use config::{Config, ConfigError, Environment, File};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use uuid::Uuid;
 
-use crate::models::integration::IntegrationName;
+use crate::models::integration::IntegrationConfig;
 
 pub static CONFIG: Lazy<AppConfig> =
     Lazy::new(|| AppConfig::load().unwrap_or_else(|e| panic!("{}", e)));
@@ -57,6 +56,10 @@ fn default_page_size() -> u8 {
     20
 }
 
+fn default_runtime() -> Runtime {
+    Runtime::Dev
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
     #[serde(default = "default_address")]
@@ -66,7 +69,6 @@ pub struct ServerConfig {
     pub gs_domain: String,
     #[serde(default = "default_page_size")]
     pub page_size: u8,
-    pub runtime: Runtime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,13 +76,8 @@ pub struct Auth0Config {
     pub domain: String,
     pub audience: String,
     pub webhook_key: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IntegrationConfig {
-    pub id: Uuid,
-    pub subject: String,
-    pub name: IntegrationName,
+    #[serde(default = "default_runtime")]
+    pub runtime: Runtime,
 }
 
 impl AppConfig {

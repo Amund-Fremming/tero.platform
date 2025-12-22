@@ -67,7 +67,9 @@ pub async fn get_game_page(
         .await?;
 
     let has_next = games.len() > page_size as usize;
-    games.pop();
+    if has_next {
+        games.pop();
+    }
     let page = PagedResponse::new(games, has_next);
 
     Ok(page)
@@ -75,23 +77,19 @@ pub async fn get_game_page(
 
 pub async fn increment_times_played(
     pool: &Pool<Postgres>,
-    game_type: GameType,
     game_id: Uuid,
 ) -> Result<(), ServerError> {
-    let query = format!(
+    let row = sqlx::query!(
         r#"
-        UPDATE {}
+        UPDATE "game_base"
         SET times_played = times_played + 1, last_played = $1
         WHERE id = $2
         "#,
-        game_type.table_name()
-    );
-
-    let row = sqlx::query(&query)
-        .bind(Utc::now())
-        .bind(game_id)
-        .execute(pool)
-        .await?;
+        Utc::now(),
+        game_id
+    )
+    .execute(pool)
+    .await?;
 
     if row.rows_affected() == 0 {
         warn!("Query failed, no game with id: {}", game_id);
@@ -204,12 +202,15 @@ pub async fn get_saved_games_page(
         limit, offset
     );
 
-    let games = sqlx::query_as::<_, GameBase>(&query)
+    let mut games = sqlx::query_as::<_, GameBase>(&query)
         .bind(user_id)
         .fetch_all(pool)
         .await?;
 
-    let has_next = games.len() < limit as usize;
+    let has_next = games.len() > limit as usize;
+    if has_next {
+        games.pop();
+    }
     let page = PagedResponse::new(games, has_next);
 
     Ok(page)

@@ -1,17 +1,11 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::models::game_base::{GameType, InitiateGameRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GSClientError {
-    #[error("The game is full")]
-    Full,
-
-    #[error("The game has started")]
-    Started,
-
     #[error("Http request failed: {0}")]
     Http(#[from] reqwest::Error),
 
@@ -68,25 +62,11 @@ impl GSClient {
         let uri = format!("session/initiate/{}", game_type.short_name(),);
         let payload = InitiateGameRequest { key, value };
 
-        // Debug: show the actual JSON that will be sent
-        let json_str = serde_json::to_string_pretty(&payload)?;
-        debug!("Serialized JSON payload:\n{}", json_str);
-
-        self.send_json(client, &uri, payload).await
-    }
-
-    async fn send_json<T: Serialize>(
-        &self,
-        client: &Client,
-        uri: &str,
-        body: T,
-    ) -> Result<(), GSClientError> {
-        debug!("GSClient sending request to: {}", uri);
         let url = format!("{}/{}", self.domain, uri);
         let response = client
             .post(&url)
             .header("content-type", "application/json")
-            .json(&body)
+            .json(&payload)
             .send()
             .await?;
 

@@ -4,22 +4,19 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 pub static INTEGRATION_NAMES: Lazy<Mutex<HashMap<String, IntegrationName>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub static INTEGRATION_IDS: Lazy<Mutex<HashMap<IntegrationName, Uuid>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Integration {
-    pub subject: String,
+pub struct IntegrationConfig {
     pub name: IntegrationName,
+    pub subject: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Hash, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "integration_name", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum IntegrationName {
     Auth0,
     Session,
@@ -39,7 +36,11 @@ impl IntegrationName {
         subject: &str,
         integrations: &Mutex<HashMap<String, IntegrationName>>,
     ) -> Option<IntegrationName> {
+        let Some(stripped) = subject.strip_suffix("@clients") else {
+            return None;
+        };
+
         let lock = integrations.lock().await;
-        lock.get(subject).cloned()
+        lock.get(stripped).cloned()
     }
 }
