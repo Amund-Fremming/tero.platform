@@ -46,10 +46,13 @@ pub async fn tx_persist_quiz_session(
     let last_played = Utc::now();
     let game_type = GameType::Quiz;
 
-    let base_row = sqlx::query!(
+    sqlx::query!(
         r#"
         INSERT INTO "game_base" (id, name, description, game_type, category, iterations, times_played, last_played)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO UPDATE SET
+            times_played = "game_base".times_played + 1,
+            last_played = EXCLUDED.last_played
         "#,
         session.base_id,
         session.name,
@@ -63,10 +66,12 @@ pub async fn tx_persist_quiz_session(
     .execute(&mut **tx)
     .await?;
 
-    let quiz_row = sqlx::query!(
+    sqlx::query!(
         r#"
         INSERT INTO "quiz_game" (id, base_id, questions)
         VALUES ($1, $2, $3)
+        ON CONFLICT (base_id) DO UPDATE SET
+            questions = EXCLUDED.questions
         "#,
         session.quiz_id,
         session.base_id,
@@ -74,12 +79,6 @@ pub async fn tx_persist_quiz_session(
     )
     .execute(&mut **tx)
     .await?;
-
-    if base_row.rows_affected() == 0 || quiz_row.rows_affected() == 0 {
-        return Err(ServerError::Internal(
-            "Failed to persist quiz session".into(),
-        ));
-    }
 
     Ok(())
 }
