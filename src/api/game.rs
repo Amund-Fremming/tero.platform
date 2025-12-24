@@ -72,7 +72,6 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             post(initiate_interactive_game),
         )
         .route("/join/{game_id}", post(join_interactive_game))
-        .route("/count/{game_type}/{game_key}", get(session_players_count))
         .with_state(state.clone());
 
     Router::new()
@@ -444,25 +443,4 @@ async fn get_saved_games(
 
     let page = get_saved_games_page(state.get_pool(), user_id, query).await?;
     Ok((StatusCode::OK, Json(page)))
-}
-
-async fn session_players_count(
-    State(state): State<Arc<AppState>>,
-    Extension(subject_id): Extension<SubjectId>,
-    Path((game_type, game_key)): Path<(GameType, String)>,
-) -> Result<impl IntoResponse, ServerError> {
-    match subject_id {
-        SubjectId::BaseUser(_) | SubjectId::PseudoUser(_) => {}
-        _ => {
-            error!("Integration tried reading player count in a session");
-            return Err(ServerError::AccessDenied);
-        }
-    };
-
-    let count = state
-        .get_gs_client()
-        .session_players_count(state.get_client(), &game_type, &game_key)
-        .await?;
-
-    Ok((StatusCode::OK, Json(count)))
 }

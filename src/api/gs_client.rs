@@ -80,34 +80,4 @@ impl GSClient {
 
         Ok(())
     }
-
-    pub async fn session_players_count(
-        &self,
-        client: &Client,
-        game_type: &GameType,
-        key: &str,
-    ) -> Result<i32, GSClientError> {
-        let url = format!(
-            "{}/session/count/{}/{}",
-            self.domain,
-            game_type.short_name(),
-            key
-        );
-
-        let response = client
-            .get(&url)
-            .header("content-type", "application/json")
-            .send()
-            .await?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or("No body".to_string());
-            error!("GSClient request failed: {} - {}", status, body);
-            return Err(GSClientError::ApiError(status, body));
-        }
-
-        let players: i32 = response.json().await?;
-        Ok(players)
-    }
 }
