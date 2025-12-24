@@ -28,8 +28,8 @@ use crate::{
         auth::Claims,
         error::ServerError,
         game_base::{
-            CreateGameRequest, GameConverter, GamePageQuery, GameType, InteractiveEnvelope,
-            JsonWrapper, SavedGamesPageQuery,
+            CreateGameRequest, GameConverter, GamePageQuery, GameType, InitiateGameRequest,
+            InteractiveEnvelope, JsonWrapper, SavedGamesPageQuery,
         },
         quiz_game::QuizSession,
         spin_game::SpinSession,
@@ -72,6 +72,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             post(initiate_interactive_game),
         )
         .route("/join/{game_id}", post(join_interactive_game))
+        .route("/count/{game_type}/{game_key}", get(session_players_count))
         .with_state(state.clone());
 
     Router::new()
@@ -156,7 +157,7 @@ async fn create_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    let payload = match game_type {
+    let value = match game_type {
         GameType::Spin => {
             let session = SpinSession::from_create_request(user_id, request);
             session.to_json_value()?
@@ -167,11 +168,15 @@ async fn create_interactive_game(
         }
     };
 
-    let game_key = vault.create_key(pool, game_type.clone())?;
-    info!("Created key: {}", game_key);
+    let key = vault.create_key(pool, game_type.clone())?;
+    let payload = InitiateGameRequest {
+        key: key.clone(),
+        value,
+    };
+    info!("Created key: {}", key);
 
     gs_client
-        .initiate_game_session(client, &game_type, game_key.clone(), payload)
+        .initiate_game_session(client, &game_type, &payload)
         .await?;
 
     let hub_address = format!(
@@ -180,10 +185,7 @@ async fn create_interactive_game(
         game_type.short_name()
     );
 
-    let response = InteractiveGameResponse {
-        game_key,
-        hub_address,
-    };
+    let response = InteractiveGameResponse { key, hub_address };
 
     debug!("Interactive game was created");
     Ok((StatusCode::CREATED, Json(response)))
@@ -238,10 +240,14 @@ async fn initiate_interactive_game(
         }
     };
 
-    let game_key = vault.create_key(pool, game_type.clone())?;
+    let key = vault.create_key(pool, game_type.clone())?;
+    let payload = InitiateGameRequest {
+        key: key.clone(),
+        value,
+    };
 
     gs_client
-        .initiate_game_session(client, &game_type, game_key.clone(), value)
+        .initiate_game_session(client, &game_type, &payload)
         .await?;
 
     let hub_address = format!(
@@ -250,10 +256,7 @@ async fn initiate_interactive_game(
         game_type.short_name()
     );
 
-    let response = InteractiveGameResponse {
-        game_key,
-        hub_address,
-    };
+    let response = InteractiveGameResponse { key, hub_address };
 
     Ok((StatusCode::OK, Json(response)))
 }
@@ -441,4 +444,25 @@ async fn get_saved_games(
 
     let page = get_saved_games_page(state.get_pool(), user_id, query).await?;
     Ok((StatusCode::OK, Json(page)))
+}
+
+async fn session_players_count(
+    State(state): State<Arc<AppState>>,
+    Extension(subject_id): Extension<SubjectId>,
+    Path((game_type, game_key)): Path<(GameType, String)>,
+) -> Result<impl IntoResponse, ServerError> {
+    match subject_id {
+        SubjectId::BaseUser(_) | SubjectId::PseudoUser(_) => {}
+        _ => {
+            error!("Integration tried reading player count in a session");
+            return Err(ServerError::AccessDenied);
+        }
+    };
+
+    let count = state
+        .get_gs_client()
+        .session_players_count(state.get_client(), &game_type, &game_key)
+        .await?;
+
+    Ok((StatusCode::OK, Json(count)))
 }

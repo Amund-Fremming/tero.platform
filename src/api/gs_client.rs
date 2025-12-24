@@ -18,7 +18,7 @@ pub enum GSClientError {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InteractiveGameResponse {
-    pub game_key: String,
+    pub key: String,
     pub hub_address: String,
 }
 
@@ -56,13 +56,14 @@ impl GSClient {
         &self,
         client: &Client,
         game_type: &GameType,
-        key: String,
-        value: serde_json::Value,
+        payload: &InitiateGameRequest,
     ) -> Result<(), GSClientError> {
-        let uri = format!("session/initiate/{}", game_type.short_name(),);
-        let payload = InitiateGameRequest { key, value };
+        let url = format!(
+            "{}/session/initiate/{}",
+            self.domain,
+            game_type.short_name()
+        );
 
-        let url = format!("{}/{}", self.domain, uri);
         let response = client
             .post(&url)
             .header("content-type", "application/json")
@@ -71,12 +72,42 @@ impl GSClient {
             .await?;
 
         let status = response.status();
-        let body = response.text().await.unwrap_or("No body".into());
         if !status.is_success() {
+            let body = response.text().await.unwrap_or("No body".into());
             error!("GSClient request failed: {} - {}", status, body);
             return Err(GSClientError::ApiError(status, body));
         }
 
         Ok(())
+    }
+
+    pub async fn session_players_count(
+        &self,
+        client: &Client,
+        game_type: &GameType,
+        key: &str,
+    ) -> Result<i32, GSClientError> {
+        let url = format!(
+            "{}/session/count/{}/{}",
+            self.domain,
+            game_type.short_name(),
+            key
+        );
+
+        let response = client
+            .get(&url)
+            .header("content-type", "application/json")
+            .send()
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or("No body".to_string());
+            error!("GSClient request failed: {} - {}", status, body);
+            return Err(GSClientError::ApiError(status, body));
+        }
+
+        let players: i32 = response.json().await?;
+        Ok(players)
     }
 }
