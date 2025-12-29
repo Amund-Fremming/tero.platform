@@ -48,12 +48,17 @@ pub struct SpinSession {
     pub current_iteration: i32,
     pub times_played: i32,
     pub last_played: DateTime<Utc>,
+    pub selection_size: i32,
     pub rounds: Vec<String>,
     pub players: HashMap<Uuid, i32>,
 }
 
 impl SpinSession {
-    pub fn from_create_request(user_id: Uuid, request: CreateGameRequest) -> Self {
+    pub fn from_create_request(
+        user_id: Uuid,
+        selection_size: i32,
+        request: CreateGameRequest,
+    ) -> Self {
         Self {
             spin_id: Uuid::new_v4(),
             base_id: Uuid::new_v4(),
@@ -66,6 +71,7 @@ impl SpinSession {
             current_iteration: 0,
             times_played: 0,
             last_played: Utc::now(),
+            selection_size,
             rounds: vec![],
             players: HashMap::from([(user_id, 0)]),
         }

@@ -157,8 +157,12 @@ async fn create_interactive_game(
     let pool = state.get_pool();
 
     let value = match game_type {
-        GameType::Spin => {
-            let session = SpinSession::from_create_request(user_id, request);
+        GameType::Roulette => {
+            let session = SpinSession::from_create_request(user_id, 1, request);
+            session.to_json_value()?
+        }
+        GameType::Duel => {
+            let session = SpinSession::from_create_request(user_id, 2, request);
             session.to_json_value()?
         }
         GameType::Quiz => {
@@ -178,12 +182,7 @@ async fn create_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!(
-        "{}/hubs/{}",
-        CONFIG.server.gs_domain,
-        game_type.short_name()
-    );
-
+    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.as_str());
     let response = InteractiveGameResponse { key, hub_address };
 
     debug!("Interactive game was created");
@@ -227,7 +226,10 @@ async fn initiate_interactive_game(
     let pool = state.get_pool();
 
     let value = match game_type {
-        GameType::Spin => {
+        GameTable::Spin => {
+            /// TODO
+            /// change get spin session by game id to get spin game by id, then use from game here instead of n db level.
+            /// make from game take in selection size, then add match case for duel here
             let session = get_spin_session_by_game_id(pool, user_id, game_id).await?;
             session.to_json_value()?
         }
@@ -285,7 +287,7 @@ async fn get_games(
 pub async fn persist_standalone_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Path(game_type): Path<GameType>,
+    Path(game_type): Path<GameTable>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
@@ -294,7 +296,7 @@ pub async fn persist_standalone_game(
     }
 
     match game_type {
-        GameType::Quiz => {
+        GameTable::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let mut tx = state.get_pool().begin().await?;
             tx_persist_quiz_session(&mut tx, &session).await?;
@@ -316,7 +318,7 @@ async fn persist_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
-    Path((game_type, game_key)): Path<(GameType, String)>,
+    Path((game_type, game_key)): Path<(GameTable, String)>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
@@ -344,7 +346,7 @@ async fn persist_interactive_game(
     info!("Removed game key: {}", game_key);
 
     match game_type {
-        GameType::Spin => {
+        GameTable::Spin => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
             match session.times_played {
                 0 => {
@@ -355,7 +357,7 @@ async fn persist_interactive_game(
                 _ => increment_times_played(pool, session.base_id).await?,
             }
         }
-        GameType::Quiz => {
+        GameTable::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             match session.times_played {
                 0 => {

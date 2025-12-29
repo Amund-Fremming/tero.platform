@@ -2,7 +2,7 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{error::ServerError, game_base::GameType, quiz_game::QuizSession};
+use crate::models::{error::ServerError, game_base::GameTable, quiz_game::QuizSession};
 
 pub async fn get_quiz_session_by_id(
     pool: &Pool<Postgres>,
@@ -44,7 +44,7 @@ pub async fn tx_persist_quiz_session(
 ) -> Result<(), ServerError> {
     let times_played = 1;
     let last_played = Utc::now();
-    let game_type = GameType::Quiz;
+    let game_type = GameTable::Quiz;
 
     sqlx::query!(
         r#"

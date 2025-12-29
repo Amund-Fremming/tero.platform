@@ -66,24 +66,24 @@ pub enum Gender {
 #[derive(Debug, Serialize, Deserialize, Hash, Clone, sqlx::Type)]
 #[sqlx(type_name = "game_type", rename_all = "lowercase")]
 pub enum GameType {
-    #[serde(rename = "Quiz")]
+    Roulette,
+    Duel,
     Quiz,
-    #[serde(rename = "Spin")]
-    Spin,
 }
 
 impl GameType {
     pub fn table_name(&self) -> &'static str {
         match self {
             GameType::Quiz => "quiz_game",
-            GameType::Spin => "spin_game",
+            GameType::Duel | GameType::Roulette => "spin_game",
         }
     }
 
-    pub fn short_name(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             GameType::Quiz => "quiz",
-            GameType::Spin => "spin",
+            GameType::Duel => "duel",
+            GameType::Roulette => "spin",
         }
     }
 }

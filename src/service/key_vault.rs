@@ -13,7 +13,7 @@ use tracing::{debug, error};
 use crate::{
     db::key_vault::get_word_sets,
     models::{
-        game_base::GameType,
+        game_base::GameTable,
         system_log::{LogAction, LogCeverity},
     },
     service::system_log_builder::SystemLogBuilder,
@@ -37,7 +37,7 @@ pub enum KeyVaultError {
 #[derive(Debug)]
 pub struct VaultValue {
     timestamp: u64,
-    game_type: GameType,
+    game_type: GameTable,
 }
 
 pub struct KeyVault {
@@ -66,7 +66,7 @@ impl KeyVault {
         Ok(vault)
     }
 
-    pub fn key_active(&self, key: &(String, String)) -> Option<GameType> {
+    pub fn key_active(&self, key: &(String, String)) -> Option<GameTable> {
         match self.active_keys.get(key) {
             Some(value) => Some(value.game_type.clone()),
             None => None,
@@ -88,7 +88,7 @@ impl KeyVault {
     pub fn create_key(
         &self,
         pool: &Pool<Postgres>,
-        game_type: GameType,
+        game_type: GameTable,
     ) -> Result<String, KeyVaultError> {
         for _ in 0..100 {
             let Ok((idx1, idx2)) = self.random_idx() else {

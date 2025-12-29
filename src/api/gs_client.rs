@@ -2,7 +2,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::models::game_base::{GameType, InitiateGameRequest};
+use crate::models::game_base::{GameTable, InitiateGameRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GSClientError {
@@ -26,7 +26,7 @@ pub struct InteractiveGameResponse {
 pub struct JoinGameResponse {
     pub game_key: String,
     pub hub_address: String,
-    pub game_type: GameType,
+    pub game_type: GameTable,
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl GSClient {
     pub async fn initiate_game_session(
         &self,
         client: &Client,
-        game_type: &GameType,
+        game_type: &GameTable,
         payload: &InitiateGameRequest,
     ) -> Result<(), GSClientError> {
         let url = format!(

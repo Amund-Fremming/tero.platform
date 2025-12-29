@@ -2,7 +2,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE "game_type" AS ENUM (
-    'spin',
+    'roulette',
+    'duel',
     'quiz'
 );
 
