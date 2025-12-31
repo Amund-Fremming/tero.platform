@@ -56,7 +56,7 @@ pub async fn get_game_page(
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
-        request.game_type.to_string(),
+        request.game_type.as_str(),
         category,
         limit,
         offset
@@ -101,7 +101,7 @@ pub async fn increment_times_played(
 
 pub async fn delete_game(
     pool: &Pool<Postgres>,
-    game_type: &GameTable,
+    game_type: &GameType,
     id: Uuid,
 ) -> Result<(), ServerError> {
     let query = format!(

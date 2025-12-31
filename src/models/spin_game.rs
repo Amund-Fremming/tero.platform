@@ -77,7 +77,7 @@ impl SpinSession {
         }
     }
 
-    pub fn from_game(user_id: Uuid, game: SpinGame) -> Self {
+    pub fn from_game(user_id: Uuid, selection_size: i32, game: SpinGame) -> Self {
         Self {
             spin_id: game.spin_id,
             base_id: game.base_id,
@@ -89,6 +89,7 @@ impl SpinSession {
             iterations: game.iterations,
             current_iteration: 0,
             times_played: game.times_played,
+            selection_size,
             last_played: game.last_played,
             rounds: game.rounds,
             players: HashMap::from([(user_id, 0)]),

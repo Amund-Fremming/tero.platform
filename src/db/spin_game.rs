@@ -4,15 +4,14 @@ use uuid::Uuid;
 
 use crate::models::{
     error::ServerError,
-    game_base::GameTable,
     spin_game::{SpinGame, SpinSession},
 };
 
-pub async fn get_spin_session_by_game_id(
+pub async fn get_spin_game_by_game_id(
     pool: &Pool<Postgres>,
     user_id: Uuid,
     game_id: Uuid,
-) -> Result<SpinSession, ServerError> {
+) -> Result<SpinGame, ServerError> {
     let game = sqlx::query_as!(
         SpinGame,
         r#"
@@ -36,8 +35,7 @@ pub async fn get_spin_session_by_game_id(
     .fetch_one(pool)
     .await?;
 
-    let session = SpinSession::from_game(user_id, game);
-    Ok(session)
+    Ok(game)
 }
 
 // TODO - update this

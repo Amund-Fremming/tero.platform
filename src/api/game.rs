@@ -21,7 +21,7 @@ use crate::{
             save_game,
         },
         quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
-        spin_game::{get_spin_session_by_game_id, tx_persist_spin_session},
+        spin_game::{get_spin_game_by_game_id, tx_persist_spin_session},
     },
     models::{
         app_state::AppState,
@@ -129,7 +129,7 @@ async fn join_interactive_game(
     let hub_address = format!(
         "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.clone().short_name()
+        game_type.clone().as_str()
     );
     let response = JoinGameResponse {
         game_key: key_word,
@@ -225,12 +225,18 @@ async fn initiate_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
+    /// TODO
+    /// change get spin session by game id to get spin game by id, then use from game here instead of n db level.
+    /// make from game take in selection size, then add match case for duel here
     let value = match game_type {
-        GameTable::Spin => {
-            /// TODO
-            /// change get spin session by game id to get spin game by id, then use from game here instead of n db level.
-            /// make from game take in selection size, then add match case for duel here
-            let session = get_spin_session_by_game_id(pool, user_id, game_id).await?;
+        GameType::Roulette => {
+            let game = get_spin_game_by_game_id(pool, user_id, game_id).await?;
+            let session = SpinSession::from_game(user_id, 1, game);
+            session.to_json_value()?
+        }
+        GameType::Roulette => {
+            let game = get_spin_game_by_game_id(pool, user_id, game_id).await?;
+            let session = SpinSession::from_game(user_id, 2, game);
             session.to_json_value()?
         }
         _ => {
@@ -251,11 +257,7 @@ async fn initiate_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!(
-        "{}/hubs/{}",
-        CONFIG.server.gs_domain,
-        game_type.short_name()
-    );
+    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.as_str());
 
     let response = InteractiveGameResponse { key, hub_address };
 
@@ -287,7 +289,7 @@ async fn get_games(
 pub async fn persist_standalone_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Path(game_type): Path<GameTable>,
+    Path(game_type): Path<GameType>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
@@ -296,7 +298,7 @@ pub async fn persist_standalone_game(
     }
 
     match game_type {
-        GameTable::Quiz => {
+        GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let mut tx = state.get_pool().begin().await?;
             tx_persist_quiz_session(&mut tx, &session).await?;
@@ -318,7 +320,7 @@ async fn persist_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
-    Path((game_type, game_key)): Path<(GameTable, String)>,
+    Path((game_type, game_key)): Path<(GameType, String)>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
@@ -346,7 +348,7 @@ async fn persist_interactive_game(
     info!("Removed game key: {}", game_key);
 
     match game_type {
-        GameTable::Spin => {
+        GameT::Spin => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
             match session.times_played {
                 0 => {
