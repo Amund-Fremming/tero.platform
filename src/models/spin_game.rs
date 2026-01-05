@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game_base::{CreateGameRequest, GameCategory, GameConverter};
+use crate::models::game_base::{CreateGameRequest, GameConverter};
 
 impl GameConverter for SpinSession {
     fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
@@ -12,7 +11,6 @@ impl GameConverter for SpinSession {
     }
 }
 
-// This does not refelct the db table "spin_game"
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SpinGame {
     pub id: Uuid,
@@ -33,7 +31,6 @@ pub struct SpinSession {
     pub game_id: Uuid,
     pub host_id: Uuid,
     pub state: SpinGameState,
-    pub iterations: i32,
     pub current_iteration: i32,
     pub selection_size: i32,
     pub rounds: Vec<String>,
@@ -41,7 +38,7 @@ pub struct SpinSession {
 }
 
 impl SpinSession {
-    pub fn from_create_request69(
+    pub fn from_create_request(
         user_id: Uuid,
         selection_size: i32,
         request: CreateGameRequest,
@@ -50,7 +47,6 @@ impl SpinSession {
             game_id: Uuid::new_v4(),
             host_id: user_id,
             state: SpinGameState::Initialized,
-            iterations: 0,
             current_iteration: 0,
             selection_size,
             rounds: vec![],
@@ -71,7 +67,6 @@ impl SpinSession {
             game_id: game.id,
             host_id: user_id,
             state: SpinGameState::Initialized,
-            iterations: game.rounds.len() as i32,
             current_iteration: 0,
             selection_size,
             rounds: game.rounds,

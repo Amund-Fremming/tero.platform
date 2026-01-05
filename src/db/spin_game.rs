@@ -34,7 +34,7 @@ pub async fn tx_persist_spin_session(
         INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#,
-        session.base_id,
+        session.game_id,
         session.name,
         &game_type as _,
         session.category as _,
@@ -45,14 +45,12 @@ pub async fn tx_persist_spin_session(
     .execute(&mut **tx)
     .await?;
 
-    let spin_id = Uuid::new_v4();
     let round_row = sqlx::query!(
         r#"
         INSERT INTO "spin_game" (id, rounds)
         VALUES ($1, $2)
         "#,
-        spin_id,
-        session.base_id,
+        session.game_id,
         &session.rounds
     )
     .execute(&mut **tx)

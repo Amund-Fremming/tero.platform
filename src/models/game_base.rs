@@ -105,8 +105,7 @@ pub struct InteractiveEnvelope {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateGameRequest {
     pub name: String,
-    pub description: Option<String>,
-    pub category: Option<GameCategory>,
+    pub category: GameCategory,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

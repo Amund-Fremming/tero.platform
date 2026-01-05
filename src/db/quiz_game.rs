@@ -2,7 +2,7 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{error::ServerError, game_base::GameTable, quiz_game::QuizSession};
+use crate::models::{error::ServerError, quiz_game::QuizSession};
 
 pub async fn get_quiz_session_by_id(
     pool: &Pool<Postgres>,
