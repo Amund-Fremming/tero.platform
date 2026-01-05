@@ -17,19 +17,19 @@ use crate::{
     db::{
         self,
         game_base::{
-            delete_saved_game, get_game_page, get_saved_games_page, increment_times_played,
-            save_game,
+            create_game_base, delete_saved_game, get_game_page, get_saved_games_page,
+            increment_times_played, save_game,
         },
         quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
-        spin_game::{get_spin_game_by_id, tx_persist_spin_session},
+        spin_game::{create_spin_game, get_spin_game_by_id},
     },
     models::{
         app_state::AppState,
         auth::Claims,
         error::ServerError,
         game_base::{
-            CreateGameRequest, GameConverter, GamePageQuery, GameType, InitiateGameRequest,
-            InteractiveEnvelope, JsonWrapper, SavedGamesPageQuery,
+            CreateGameRequest, GameBase, GameConverter, GamePageQuery, GameType,
+            InitiateGameRequest, InteractiveEnvelope, JsonWrapper, SavedGamesPageQuery,
         },
         quiz_game::QuizSession,
         spin_game::SpinSession,
@@ -156,20 +156,27 @@ async fn create_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    let value = match game_type {
+    // TODO - store game-base part of the thingy, fire and forget mayvbe?
+    let (value, game_base) = match game_type {
         GameType::Roulette => {
-            let session = SpinSession::from_create_request(user_id, 1, request);
-            session.to_json_value()?
+            let game_base = GameBase::from_request(&request, GameType::Roulette);
+            let session = SpinSession::from_duel_request(user_id, game_base.id, &request);
+            (session.to_json_value()?, game_base)
         }
         GameType::Duel => {
-            let session = SpinSession::from_create_request(user_id, 2, request);
-            session.to_json_value()?
+            let game_base = GameBase::from_request(&request, GameType::Duel);
+            let session_json =
+                SpinSession::from_duel_request(user_id, game_base.id, &request).to_json_value()?;
+            (session_json, game_base)
         }
         GameType::Quiz => {
-            let session = QuizSession::from_create_request(request);
-            session.to_json_value()?
+            let game_base = GameBase::from_request(&request, GameType::Quiz);
+            let session_json = QuizSession::from_create_request(request).to_json_value()?;
+            (session_json, game_base)
         }
     };
+
+    create_game_base(pool, &game_base).await?;
 
     let key = vault.create_key(pool, game_type.clone())?;
     let payload = InitiateGameRequest {
@@ -233,7 +240,7 @@ async fn initiate_interactive_game(
         }
         GameType::Duel => {
             let game = get_spin_game_by_id(pool, game_id).await?;
-            let session = SpinSession::from_roulett(user_id, game);
+            let session = SpinSession::from_roulette(user_id, game);
             session.to_json_value()?
         }
         _ => {
@@ -345,27 +352,16 @@ async fn persist_interactive_game(
     info!("Removed game key: {}", game_key);
 
     match game_type {
-        GameT::Spin => {
+        GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
-            match session.times_played {
-                0 => {
-                    let mut tx = pool.begin().await?;
-                    tx_persist_spin_session(&mut tx, &session).await?;
-                    tx.commit().await?;
-                }
-                _ => increment_times_played(pool, session.base_id).await?,
-            }
+            let game_id = session.game_id;
+            create_spin_game(pool, &session.into()).await?;
+            increment_times_played(pool, game_id).await?;
         }
-        GameTable::Quiz => {
+        GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            match session.times_played {
-                0 => {
-                    let mut tx = pool.begin().await?;
-                    tx_persist_quiz_session(&mut tx, &session).await?;
-                    tx.commit().await?;
-                }
-                _ => increment_times_played(pool, session.base_id).await?,
-            }
+            create_quiz_game(pool, &session.into()).await?;
+            increment_times_played(pool, session.base_id).await?;
         }
     }
 

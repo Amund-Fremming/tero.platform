@@ -17,6 +17,15 @@ pub struct SpinGame {
     pub rounds: Vec<String>,
 }
 
+impl Into<SpinGame> for SpinSession {
+    fn into(self) -> SpinGame {
+        SpinGame {
+            id: self.game_id,
+            rounds: self.rounds,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SpinGameState {
     Initialized,
@@ -38,31 +47,44 @@ pub struct SpinSession {
 }
 
 impl SpinSession {
-    pub fn from_create_request(
-        user_id: Uuid,
+    pub fn from_duel_request(host_id: Uuid, game_id: Uuid, request: &CreateGameRequest) -> Self {
+        Self::from_request(host_id, game_id, request, 1)
+    }
+
+    pub fn from_roulette_request(
+        host_id: Uuid,
+        game_id: Uuid,
+        request: &CreateGameRequest,
+    ) -> Self {
+        Self::from_request(host_id, game_id, request, 1)
+    }
+
+    fn from_request(
+        host_id: Uuid,
+        game_id: Uuid,
+        request: &CreateGameRequest,
         selection_size: i32,
-        request: CreateGameRequest,
     ) -> Self {
         Self {
-            game_id: Uuid::new_v4(),
-            host_id: user_id,
+            game_id,
+            host_id,
             state: SpinGameState::Initialized,
             current_iteration: 0,
             selection_size,
             rounds: vec![],
-            players: HashMap::from([(user_id, 0)]),
+            players: HashMap::from([(host_id, 0)]),
         }
     }
 
     pub fn from_duel(user_id: Uuid, game: SpinGame) -> Self {
-        Self::from_game(user_id, 2, game)
+        Self::from_game(user_id, game, 2)
     }
 
-    pub fn from_roulett(user_id: Uuid, game: SpinGame) -> Self {
-        Self::from_game(user_id, 1, game)
+    pub fn from_roulette(user_id: Uuid, game: SpinGame) -> Self {
+        Self::from_game(user_id, game, 1)
     }
 
-    fn from_game(user_id: Uuid, selection_size: i32, game: SpinGame) -> Self {
+    fn from_game(user_id: Uuid, game: SpinGame, selection_size: i32) -> Self {
         Self {
             game_id: game.id,
             host_id: user_id,

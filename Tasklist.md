@@ -154,6 +154,7 @@
 - [ ] Cache is broken
 - [ ] Load integrations from config
 - [ ] Remove unnessesarry Derives especially Clones
+      VERIFISER AT IKKE HOST BLIR LAGT TIL HER OG NÅR MAN JOINER VIA HUB
 
 - [ ] Move auth0 id to pseudo user? and rename it to something more generic
   - Could be nice as nullable to know if the pseudo has a registered user
@@ -168,3 +169,9 @@
 **Before release?**
 
 - [ ] Patch user should chech for unique username and show error
+
+LEFT OFF
+
+- fixing quiz create quiz game and db fucntions
+- missing into from session for quiz game
+- in spin game add if conflcics just increment for quiz game also????

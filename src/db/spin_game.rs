@@ -1,12 +1,8 @@
-use chrono::Utc;
-use sqlx::{Pool, Postgres, Transaction};
+use sqlx::{Pool, Postgres};
+use tracing::warn;
 use uuid::Uuid;
 
-use crate::models::{
-    error::ServerError,
-    game_base::GameType,
-    spin_game::{SpinGame, SpinSession},
-};
+use crate::models::{error::ServerError, spin_game::SpinGame};
 
 pub async fn get_spin_game_by_id(pool: &Pool<Postgres>, id: Uuid) -> Result<SpinGame, sqlx::Error> {
     sqlx::query_as!(
@@ -22,44 +18,20 @@ pub async fn get_spin_game_by_id(pool: &Pool<Postgres>, id: Uuid) -> Result<Spin
     .await
 }
 
-// TODO - update this
-pub async fn tx_persist_spin_session(
-    tx: &mut Transaction<'_, Postgres>,
-    session: &SpinSession,
-    game_type: &GameType,
-) -> Result<(), ServerError> {
-    let last_played = Utc::now();
-    let game_row = sqlx::query!(
-        r#"
-        INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        "#,
-        session.game_id,
-        session.name,
-        &game_type as _,
-        session.category as _,
-        session.iterations,
-        1,
-        last_played
-    )
-    .execute(&mut **tx)
-    .await?;
-
-    let round_row = sqlx::query!(
+pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<(), ServerError> {
+    let row = sqlx::query!(
         r#"
         INSERT INTO "spin_game" (id, rounds)
         VALUES ($1, $2)
         "#,
-        session.game_id,
-        &session.rounds
+        game.id,
+        &game.rounds
     )
-    .execute(&mut **tx)
+    .execute(pool)
     .await?;
 
-    if game_row.rows_affected() == 0 || round_row.rows_affected() == 0 {
-        return Err(ServerError::Internal(
-            "Failed to persist spin game session".into(),
-        ));
+    if row.rows_affected() == 0 {
+        warn!("Skipping game base creation: id already exists")
     }
 
     Ok(())

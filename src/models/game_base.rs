@@ -29,6 +29,20 @@ pub struct GameBase {
     pub last_played: DateTime<Utc>,
 }
 
+impl GameBase {
+    pub fn from_request(request: &CreateGameRequest, game_type: GameType) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            name: request.name.clone(),
+            game_type,
+            category: request.category.clone(),
+            iterations: 0,
+            times_played: 0,
+            last_played: Utc::now(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Hash, Clone, sqlx::Type)]
 #[sqlx(type_name = "game_category", rename_all = "lowercase")]
 pub enum GameCategory {

@@ -12,8 +12,32 @@ use crate::{
     service::popup_manager::PagedResponse,
 };
 
+pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
+    // newly created games are not played
+    let times_played = 0;
+    let row = sqlx::query!(
+        r#"
+        INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "#,
+        game.id,
+        game.name,
+        game.game_type as _,
+        game.category as _,
+        game.iterations,
+        times_played,
+        game.last_played
+    ).execute(pool).await?;
+
+    if row.rows_affected() == 0 {
+        warn!("Skipping game base creation: id already exists")
+    }
+
+    Ok(())
+}
+
 pub async fn delete_non_active_games(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
-    let timeout = Utc::now() - Duration::days(24);
+    let timeout = Utc::now() - Duration::days(24); // TODO - add to config
     sqlx::query!(
         r#"
         DELETE FROM "game_base"

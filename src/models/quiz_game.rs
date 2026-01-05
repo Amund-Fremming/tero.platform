@@ -11,10 +11,8 @@ impl GameConverter for QuizSession {
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct QuizSession {
-    pub base_id: Uuid,
-    pub quiz_id: Uuid,
+    pub game_id: Uuid,
     pub name: String,
-    pub description: Option<String>,
     pub category: GameCategory,
     pub iterations: i32,
     pub current_iteration: i32,
@@ -28,8 +26,7 @@ impl QuizSession {
             base_id: Uuid::new_v4(),
             quiz_id: Uuid::new_v4(),
             name: request.name,
-            description: request.description,
-            category: request.category.unwrap_or(GameCategory::All),
+            category: request.category,
             iterations: 0,
             current_iteration: 0,
             questions: vec![],
