@@ -35,11 +35,10 @@ CREATE TYPE "subject_type" AS ENUM (
 );
 
 CREATE TYPE game_category AS ENUM (
-    'casual',
+    'vors',
     'ladies',
     'boys',
-    'default',
-    'random'
+    'all'
 );
 
 CREATE TYPE gender AS ENUM (
@@ -111,23 +110,20 @@ CREATE TABLE "base_user" (
 CREATE TABLE "game_base" (
     "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     "name" VARCHAR(100) NOT NULL,
-    "description" VARCHAR(150),
     "game_type" game_type NOT NULL,
-    "category" game_category NOT NULL DEFAULT 'casual',
+    "category" game_category NOT NULL DEFAULT 'all',
     "iterations" INTEGER NOT NULL DEFAULT 0,
     "times_played" INTEGER NOT NULL DEFAULT 0,
     "last_played" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE "quiz_game" (
-    "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    "base_id" UUID NOT NULL,
+    "id" UUID PRIMARY KEY,
     "questions" TEXT[] NOT NULL
 );
 
 CREATE TABLE "spin_game" (
-    "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    "base_id" UUID NOT NULL,
+    "id" UUID PRIMARY KEY,
     "rounds" TEXT[] NOT NULL
 );
 
@@ -139,10 +135,6 @@ CREATE INDEX "idx_system_log_ceverity" ON "system_log" ("ceverity", "created_at"
 CREATE INDEX "idx_game_tip_created_at" ON "game_tip" ("created_at" DESC);
 
 CREATE INDEX "idx_integration_subject" ON "integration" ("subject");
-
-CREATE INDEX "idx_quiz_game_id" ON "quiz_game" ("id");
-
-CREATE INDEX "idx_spin_game_id" ON "spin_game" ("id");
 
 CREATE INDEX "idx_game_base_id" ON "game_base" ("id");
 CREATE INDEX "idx_game_base_game_type" ON "game_base" ("game_type", "times_played" DESC);
@@ -164,8 +156,8 @@ FOREIGN KEY ("base_id") REFERENCES "game_base"("id") ON DELETE CASCADE;
 
 ALTER TABLE "quiz_game"
 ADD CONSTRAINT "fk_quiz_game_base" 
-FOREIGN KEY ("base_id") REFERENCES "game_base"("id") ON DELETE CASCADE;
+FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;
 
 ALTER TABLE "spin_game"
 ADD CONSTRAINT "fk_spin_game_base" 
-FOREIGN KEY ("base_id") REFERENCES "game_base"("id") ON DELETE CASCADE;
+FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;

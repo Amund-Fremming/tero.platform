@@ -48,7 +48,7 @@ pub async fn tx_persist_quiz_session(
 
     sqlx::query!(
         r#"
-        INSERT INTO "game_base" (id, name, description, game_type, category, iterations, times_played, last_played)
+        INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (id) DO UPDATE SET
             times_played = "game_base".times_played + 1,
@@ -56,7 +56,6 @@ pub async fn tx_persist_quiz_session(
         "#,
         session.base_id,
         session.name,
-        session.description,
         &game_type as _,
         session.category as _,
         session.iterations,

@@ -22,7 +22,6 @@ pub enum JsonWrapper {
 pub struct GameBase {
     pub id: Uuid,
     pub name: String,
-    pub description: Option<String>,
     pub game_type: GameType,
     pub category: GameCategory,
     pub iterations: i32,
@@ -33,21 +32,19 @@ pub struct GameBase {
 #[derive(Debug, Serialize, Deserialize, Hash, Clone, sqlx::Type)]
 #[sqlx(type_name = "game_category", rename_all = "lowercase")]
 pub enum GameCategory {
-    Casual,
-    Random,
+    Vors,
     Ladies,
     Boys,
-    Default,
+    All,
 }
 
 impl fmt::Display for GameCategory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameCategory::Casual => write!(f, "casual"),
             GameCategory::Ladies => write!(f, "ladies"),
             GameCategory::Boys => write!(f, "boys"),
-            GameCategory::Default => write!(f, "default"),
-            GameCategory::Random => write!(f, "random"),
+            GameCategory::Vors => write!(f, "vors"),
+            GameCategory::All => write!(f, "all"),
         }
     }
 }

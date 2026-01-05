@@ -11,9 +11,6 @@ DROP INDEX IF EXISTS "idx_saved_game_id";
 
 DROP INDEX IF EXISTS "idx_system_log_ceverity";
 
-DROP INDEX IF EXISTS "idx_quiz_game_id";
-
-DROP INDEX IF EXISTS "idx_spin_game_id";
 DROP INDEX IF EXISTS "idx_saved_game_delete_keys";
 
 DROP INDEX IF EXISTS "idx_integration_subject";

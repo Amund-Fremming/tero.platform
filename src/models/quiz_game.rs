@@ -29,7 +29,7 @@ impl QuizSession {
             quiz_id: Uuid::new_v4(),
             name: request.name,
             description: request.description,
-            category: request.category.unwrap_or(GameCategory::Default),
+            category: request.category.unwrap_or(GameCategory::All),
             iterations: 0,
             current_iteration: 0,
             questions: vec![],

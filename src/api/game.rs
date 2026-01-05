@@ -21,7 +21,7 @@ use crate::{
             save_game,
         },
         quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
-        spin_game::{get_spin_game_by_game_id, tx_persist_spin_session},
+        spin_game::{get_spin_game_by_id, tx_persist_spin_session},
     },
     models::{
         app_state::AppState,
@@ -225,18 +225,15 @@ async fn initiate_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    /// TODO
-    /// change get spin session by game id to get spin game by id, then use from game here instead of n db level.
-    /// make from game take in selection size, then add match case for duel here
     let value = match game_type {
         GameType::Roulette => {
-            let game = get_spin_game_by_game_id(pool, user_id, game_id).await?;
-            let session = SpinSession::from_game(user_id, 1, game);
+            let game = get_spin_game_by_id(pool, game_id).await?;
+            let session = SpinSession::from_duel(user_id, game);
             session.to_json_value()?
         }
-        GameType::Roulette => {
-            let game = get_spin_game_by_game_id(pool, user_id, game_id).await?;
-            let session = SpinSession::from_game(user_id, 2, game);
+        GameType::Duel => {
+            let game = get_spin_game_by_id(pool, game_id).await?;
+            let session = SpinSession::from_roulett(user_id, game);
             session.to_json_value()?
         }
         _ => {
