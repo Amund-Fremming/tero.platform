@@ -20,7 +20,7 @@ use crate::{
             create_game_base, delete_saved_game, get_game_page, get_saved_games_page,
             increment_times_played, save_game,
         },
-        quiz_game::{get_quiz_session_by_id, tx_persist_quiz_session},
+        quiz_game::{create_quiz_game, get_quiz_game_by_id},
         spin_game::{create_spin_game, get_spin_game_by_id},
     },
     models::{
@@ -156,26 +156,25 @@ async fn create_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    // TODO - store game-base part of the thingy, fire and forget mayvbe?
     let (value, game_base) = match game_type {
         GameType::Roulette => {
             let game_base = GameBase::from_request(&request, GameType::Roulette);
-            let session = SpinSession::from_duel_request(user_id, game_base.id, &request);
-            (session.to_json_value()?, game_base)
+            let session = SpinSession::new_roulette(user_id, game_base.id).to_json_value()?;
+            (session, game_base)
         }
         GameType::Duel => {
             let game_base = GameBase::from_request(&request, GameType::Duel);
-            let session_json =
-                SpinSession::from_duel_request(user_id, game_base.id, &request).to_json_value()?;
+            let session_json = SpinSession::new_duel(user_id, game_base.id).to_json_value()?;
             (session_json, game_base)
         }
         GameType::Quiz => {
             let game_base = GameBase::from_request(&request, GameType::Quiz);
-            let session_json = QuizSession::from_create_request(request).to_json_value()?;
+            let session_json = QuizSession::new().to_json_value()?;
             (session_json, game_base)
         }
     };
 
+    // Store game base TODO - maybe fire and forget? with log?
     create_game_base(pool, &game_base).await?;
 
     let key = vault.create_key(pool, game_type.clone())?;
@@ -196,6 +195,7 @@ async fn create_interactive_game(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
+// TODO - maybe only one detour to database, make increment return full object? or new fn
 async fn initiate_standalone_game(
     State(state): State<Arc<AppState>>,
     Extension(_subject_id): Extension<SubjectId>,
@@ -203,7 +203,9 @@ async fn initiate_standalone_game(
 ) -> Result<impl IntoResponse, ServerError> {
     let wrapper = match game_type {
         GameType::Quiz => {
-            let session = get_quiz_session_by_id(state.get_pool(), &game_id).await?;
+            let game = get_quiz_game_by_id(state.get_pool(), &game_id).await?;
+            increment_times_played(state.get_pool(), game.id).await?;
+            let session = QuizSession::from_game(game);
             JsonWrapper::QuizWrapper(session)
         }
         _ => {
@@ -304,9 +306,8 @@ pub async fn persist_standalone_game(
     match game_type {
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            let mut tx = state.get_pool().begin().await?;
-            tx_persist_quiz_session(&mut tx, &session).await?;
-            tx.commit().await?;
+            increment_times_played(state.get_pool(), session.game_id).await?;
+            create_quiz_game(state.get_pool(), &session.into()).await?;
         }
         _ => {
             return Err(ServerError::Api(
@@ -354,14 +355,13 @@ async fn persist_interactive_game(
     match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
-            let game_id = session.game_id;
+            increment_times_played(pool, session.game_id).await?;
             create_spin_game(pool, &session.into()).await?;
-            increment_times_played(pool, game_id).await?;
         }
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
+            increment_times_played(pool, session.game_id).await?;
             create_quiz_game(pool, &session.into()).await?;
-            increment_times_played(pool, session.base_id).await?;
         }
     }
 

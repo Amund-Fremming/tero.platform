@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game_base::{CreateGameRequest, GameConverter};
+use crate::models::game_base::GameConverter;
 
 impl GameConverter for SpinSession {
     fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
@@ -47,24 +47,15 @@ pub struct SpinSession {
 }
 
 impl SpinSession {
-    pub fn from_duel_request(host_id: Uuid, game_id: Uuid, request: &CreateGameRequest) -> Self {
-        Self::from_request(host_id, game_id, request, 1)
+    pub fn new_duel(host_id: Uuid, game_id: Uuid) -> Self {
+        Self::from_request(host_id, game_id, 1)
     }
 
-    pub fn from_roulette_request(
-        host_id: Uuid,
-        game_id: Uuid,
-        request: &CreateGameRequest,
-    ) -> Self {
-        Self::from_request(host_id, game_id, request, 1)
+    pub fn new_roulette(host_id: Uuid, game_id: Uuid) -> Self {
+        Self::from_request(host_id, game_id, 1)
     }
 
-    fn from_request(
-        host_id: Uuid,
-        game_id: Uuid,
-        request: &CreateGameRequest,
-        selection_size: i32,
-    ) -> Self {
+    fn from_request(host_id: Uuid, game_id: Uuid, selection_size: i32) -> Self {
         Self {
             game_id,
             host_id,

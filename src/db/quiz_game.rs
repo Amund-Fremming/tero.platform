@@ -1,57 +1,46 @@
-use chrono::Utc;
-use sqlx::{Pool, Postgres, Transaction};
+use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
-use crate::models::{error::ServerError, quiz_game::QuizSession};
+use crate::models::{
+    error::ServerError,
+    quiz_game::{QuizGame, QuizSession},
+};
 
-// TODO - make it get quiz game not sessio
-pub async fn get_quiz_session_by_id(
+pub async fn get_quiz_game_by_id(
     pool: &Pool<Postgres>,
-    base_id: &Uuid,
-) -> Result<QuizSession, ServerError> {
-    let session = sqlx::query_as!(
-        QuizSession,
+    game_id: &Uuid,
+) -> Result<QuizGame, ServerError> {
+    let game = sqlx::query_as!(
+        QuizGame,
         r#"
-        SELECT 
-            base.id AS base_id,
-            quiz.id AS quiz_id,
-            base.name,
-            base.description,
-            base.category as "category: _",
-            base.iterations,
-            base.times_played as "times_played!",
-            0 AS "current_iteration!",
-            quiz.questions
-        FROM "game_base" base
-        JOIN "quiz_game" quiz
-        ON base.id = quiz.base_id
-        WHERE base.id = $1
+        SELECT id, questions
+        FROM "quiz_game" 
+        WHERE id = $1
         "#,
-        base_id
+        game_id
     )
     .fetch_optional(pool)
     .await?
     .ok_or(ServerError::NotFound(format!(
         "Quiz with id {} does not exist",
-        base_id
+        game_id
     )))?;
 
-    Ok(session)
+    Ok(game)
 }
 
-pub async fn tx_persist_quiz_session(
+pub async fn create_quiz_game(
     pool: &Pool<Postgres>,
     session: &QuizSession,
 ) -> Result<(), ServerError> {
     sqlx::query!(
         r#"
-        INSERT INTO "quiz_game" (id, base_id, questions)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (base_id) DO UPDATE SET
+        INSERT INTO "quiz_game" (id, questions)
+        VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE SET
             questions = EXCLUDED.questions
         "#,
-        session.quiz_id,
-        session.base_id,
+        session.game_id,
         &session.questions
     )
     .execute(pool)

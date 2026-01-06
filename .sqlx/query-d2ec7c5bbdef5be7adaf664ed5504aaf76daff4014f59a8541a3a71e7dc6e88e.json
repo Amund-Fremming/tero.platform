@@ -1,19 +1,19 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO \"game_base\" (id, name, description, game_type, category, iterations, times_played, last_played)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n        ",
+  "query": "\n        INSERT INTO \"game_base\" (id, name, game_type, category, iterations, times_played, last_played)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
         "Varchar",
-        "Varchar",
         {
           "Custom": {
             "name": "game_type",
             "kind": {
               "Enum": [
-                "spin",
+                "roulette",
+                "duel",
                 "quiz"
               ]
             }
@@ -24,11 +24,10 @@
             "name": "game_category",
             "kind": {
               "Enum": [
-                "casual",
+                "vors",
                 "ladies",
                 "boys",
-                "default",
-                "random"
+                "all"
               ]
             }
           }
@@ -40,5 +39,5 @@
     },
     "nullable": []
   },
-  "hash": "cf9aea6a66ccf688a194a1b5b2afc6dbcb27e5db0ffe225eb46925f69154bd65"
+  "hash": "d2ec7c5bbdef5be7adaf664ed5504aaf76daff4014f59a8541a3a71e7dc6e88e"
 }
