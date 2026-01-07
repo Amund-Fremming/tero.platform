@@ -146,8 +146,8 @@
 
 - [x] Implement new gameType for platform and hub
 - [x] Change gamesession to be more slim, and only send wqhats needed over
-- [ ] endre til å ikke bruke joined queries for å hente sessions, bare bruk id fra game base som er pk på spesifikke spill. Sett opp bedre indekser
-- [ ] ibput validering
+- [x] endre til å ikke bruke joined queries for å hente sessions, bare bruk id fra game base som er pk på spesifikke spill. Sett opp bedre indekser
+- [ ] input validering
 - [ ] ikke mulig å starte stpill om ikke nok spm
 - [ ] endre flyt av opprett spill, endten lagre sgame base direkte så lagre spesifikk etterpå ( må ha retention )
 - [ ]
