@@ -174,7 +174,7 @@ async fn create_interactive_game(
         }
     };
 
-    // Store game base TODO - maybe fire and forget? with log?
+    // Store game base
     create_game_base(pool, &game_base).await?;
 
     let key = vault.create_key(pool, game_type.clone())?;

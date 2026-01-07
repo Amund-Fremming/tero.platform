@@ -50,24 +50,6 @@ pub struct Auth0User {
     pub family_name: Option<String>,
 }
 
-#[allow(dead_code)] // TODO
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "user_type", rename_all = "lowercase")]
-pub enum UserType {
-    #[serde(rename(deserialize = "guest"))]
-    Guest,
-    #[serde(rename(deserialize = "registered"))]
-    Registered,
-    Admin,
-}
-
-#[allow(dead_code)] // TODO
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct PseudoUser {
-    pub id: Uuid,
-    pub last_active: DateTime<Utc>,
-}
-
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct BaseUser {
     pub id: Uuid,

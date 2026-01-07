@@ -77,7 +77,6 @@ pub async fn get_system_log_page(
     Ok(page)
 }
 
-#[allow(clippy::too_many_arguments)] // TODO
 pub async fn create_system_log(
     pool: &Pool<Postgres>,
     subject_id: &str,

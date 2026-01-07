@@ -144,8 +144,8 @@
 - [x] Cascades
 - [x] Use compile time checks with query macros
 
-- [ ] Implement new gameType for platform and hub
-- [ ] Change gamesession to be more slim, and only send wqhats needed over
+- [x] Implement new gameType for platform and hub
+- [x] Change gamesession to be more slim, and only send wqhats needed over
 - [ ] endre til å ikke bruke joined queries for å hente sessions, bare bruk id fra game base som er pk på spesifikke spill. Sett opp bedre indekser
 - [ ] ibput validering
 - [ ] ikke mulig å starte stpill om ikke nok spm

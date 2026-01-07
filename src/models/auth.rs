@@ -9,7 +9,7 @@ pub struct Jwks {
     pub keys: [Jwk; 2],
 }
 
-#[allow(dead_code)] // TODO
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct Jwk {
     pub kid: String,

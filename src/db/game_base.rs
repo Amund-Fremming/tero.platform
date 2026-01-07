@@ -37,7 +37,7 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
 }
 
 pub async fn delete_non_active_games(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
-    let timeout = Utc::now() - Duration::days(24); // TODO - add to config
+    let timeout = Utc::now() - Duration::days(CONFIG.server.active_game_retention as i64);
     sqlx::query!(
         r#"
         DELETE FROM "game_base"
@@ -116,7 +116,10 @@ pub async fn increment_times_played(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("Query failed, no game with id: {}", game_id);
+        warn!(
+            "Failed to increment times played to DB with game_id: {}",
+            game_id
+        );
         return Err(ServerError::NotFound("Game does not exist".into()));
     }
 
