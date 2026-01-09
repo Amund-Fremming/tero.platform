@@ -32,9 +32,9 @@ pub struct QuizSession {
 }
 
 impl QuizSession {
-    pub fn new() -> Self {
+    pub fn new(game_id: Uuid) -> Self {
         Self {
-            game_id: Uuid::new_v4(),
+            game_id,
             current_iteration: 0,
             questions: vec![],
         }

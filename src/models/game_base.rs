@@ -94,7 +94,14 @@ impl GameType {
         match self {
             GameType::Quiz => "quiz",
             GameType::Duel => "duel",
-            GameType::Roulette => "spin",
+            GameType::Roulette => "roulette",
+        }
+    }
+
+    pub fn hub_name(&self) -> &'static str {
+        match self {
+            GameType::Quiz => "quiz",
+            GameType::Duel | GameType::Roulette => "spin",
         }
     }
 }

@@ -27,7 +27,9 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
         game.iterations,
         times_played,
         game.last_played
-    ).execute(pool).await?;
+    )
+    .execute(pool)
+    .await?;
 
     if row.rows_affected() == 0 {
         warn!("Skipping game base creation: id already exists")
@@ -69,7 +71,6 @@ pub async fn get_game_page(
         SELECT 
             id,
             name,
-            description,
             game_type,
             category,
             iterations,

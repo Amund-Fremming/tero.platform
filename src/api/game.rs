@@ -129,7 +129,7 @@ async fn join_interactive_game(
     let hub_address = format!(
         "{}/hubs/{}",
         CONFIG.server.gs_domain,
-        game_type.clone().as_str()
+        game_type.clone().hub_name()
     );
     let response = JoinGameResponse {
         game_key: key_word,
@@ -159,8 +159,8 @@ async fn create_interactive_game(
     let (value, game_base) = match game_type {
         GameType::Roulette => {
             let game_base = GameBase::from_request(&request, GameType::Roulette);
-            let session = SpinSession::new_roulette(user_id, game_base.id).to_json_value()?;
-            (session, game_base)
+            let session_json = SpinSession::new_roulette(user_id, game_base.id).to_json_value()?;
+            (session_json, game_base)
         }
         GameType::Duel => {
             let game_base = GameBase::from_request(&request, GameType::Duel);
@@ -169,7 +169,7 @@ async fn create_interactive_game(
         }
         GameType::Quiz => {
             let game_base = GameBase::from_request(&request, GameType::Quiz);
-            let session_json = QuizSession::new().to_json_value()?;
+            let session_json = QuizSession::new(game_base.id).to_json_value()?;
             (session_json, game_base)
         }
     };
@@ -188,7 +188,7 @@ async fn create_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.as_str());
+    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse { key, hub_address };
 
     debug!("Interactive game was created");
