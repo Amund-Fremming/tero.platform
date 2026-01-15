@@ -176,6 +176,7 @@ async fn create_interactive_game(
 
     // Store game base
     create_game_base(pool, &game_base).await?;
+    info!("Persisted interactive game base");
 
     let key = vault.create_key(pool, game_type.clone())?;
     let payload = InitiateGameRequest {
@@ -191,7 +192,6 @@ async fn create_interactive_game(
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse { key, hub_address };
 
-    debug!("Interactive game was created");
     Ok((StatusCode::CREATED, Json(response)))
 }
 
@@ -365,7 +365,7 @@ async fn persist_interactive_game(
         }
     }
 
-    info!("Persisted interactive game");
+    info!("Persisted interactive specialized game");
     Ok(StatusCode::CREATED)
 }
 
