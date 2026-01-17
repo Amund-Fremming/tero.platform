@@ -143,7 +143,7 @@
 - [x] Create relations where possible
 - [x] Cascades
 - [x] Use compile time checks with query macros
-
+- [x] fix cache
 - [x] Implement new gameType for platform and hub
 - [x] Change gamesession to be more slim, and only send wqhats needed over
 - [x] endre til å ikke bruke joined queries for å hente sessions, bare bruk id fra game base som er pk på spesifikke spill. Sett opp bedre indekser
@@ -153,10 +153,9 @@
 - [ ] ikke mulig å starte stpill om ikke nok spm
 - [ ] endre flyt av opprett spill, endten lagre sgame base direkte så lagre spesifikk etterpå ( må ha retention )
 - [ ]
-- [ ] Cache is broken
 - [ ] Load integrations from config
 - [ ] Remove unnessesarry Derives especially Clones
-      VERIFISER AT IKKE HOST BLIR LAGT TIL HER OG NÅR MAN JOINER VIA HUB
+- [ ] VERIFISER AT IKKE HOST BLIR LAGT TIL HER OG NÅR MAN JOINER VIA HUB
 
 - [ ] Move auth0 id to pseudo user? and rename it to something more generic
   - Could be nice as nullable to know if the pseudo has a registered user

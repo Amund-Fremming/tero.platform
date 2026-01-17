@@ -102,7 +102,7 @@ async fn delete_game(
 
     tokio::spawn(async move {
         if let Err(e) = cache_pointer
-            .invalidate_category(deleted_game.game_type, &deleted_game.category)
+            .invalidate(deleted_game.game_type, &deleted_game.category)
             .await
         {
             error!("Failed to invalidate cache: {}", e);
@@ -211,7 +211,7 @@ async fn create_interactive_game(
     let state_pointer = state.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = cache.invalidate_category(game_type_clone, &category).await {
+        if let Err(e) = cache.invalidate(game_type_clone, &category).await {
             error!("Failed to invalidate cache: {}", e);
             state_pointer
                 .syslog()
