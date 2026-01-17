@@ -2,7 +2,7 @@
 mod tests {
     use std::{env, sync::Arc};
 
-    use dotenv::dotenv;
+    use dotenvy::dotenv;
 
     use crate::{
         models::{app_state::AppState, game_base::GameType},

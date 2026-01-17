@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use axum::{Router, middleware::from_fn_with_state, routing::post};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use models::app_state::AppState;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};

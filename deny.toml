@@ -1,15 +1,14 @@
-# cargo-deny configuration
-# https://embarkstudios.github.io/cargo-deny/
-
 [advisories]
 version = 2
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore = []
+# Ignore known issues with no available fix
+ignore = [
+    "RUSTSEC-2023-0071", # rsa: Marvin Attack - transitive dep from jsonwebtoken, no fix available
+]
 
 [licenses]
 version = 2
-# Allow common permissive licenses
 allow = [
     "MIT",
     "Apache-2.0",
@@ -25,6 +24,7 @@ allow = [
     "CC0-1.0",
     "BSL-1.0",
     "Unlicense",
+    "OpenSSL",                        # Added for native-tls/openssl-sys dependencies
 ]
 confidence-threshold = 0.8
 
@@ -32,6 +32,19 @@ confidence-threshold = 0.8
 multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
+# Add these skips to suppress the specific warnings in your CI logs
+skip = [
+    { name = "base64" },
+    { name = "getrandom" },
+    { name = "hashbrown" },
+    { name = "rand" },
+    { name = "rand_core" },
+    { name = "regex-syntax" },
+    { name = "regex-automata" },
+    { name = "wasi" },
+    { name = "windows-sys" },
+    { name = "windows-targets" },
+]
 
 [sources]
 unknown-registry = "warn"
