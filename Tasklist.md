@@ -147,6 +147,8 @@
 - [x] Implement new gameType for platform and hub
 - [x] Change gamesession to be more slim, and only send wqhats needed over
 - [x] endre til å ikke bruke joined queries for å hente sessions, bare bruk id fra game base som er pk på spesifikke spill. Sett opp bedre indekser
+
+- [ ] set max stored games to 20? make frontend display this message correctly by matching some status code
 - [ ] input validering
 - [ ] ikke mulig å starte stpill om ikke nok spm
 - [ ] endre flyt av opprett spill, endten lagre sgame base direkte så lagre spesifikk etterpå ( må ha retention )

@@ -11,10 +11,17 @@ pub trait GameConverter {
     fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error>;
 }
 
+#[derive(Debug, sqlx::FromRow)]
+pub struct DeleteGameResult {
+    pub game_type: GameType,
+    pub category: GameCategory,
+}
+
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum JsonWrapper {
     QuizWrapper(QuizSession),
+    #[allow(dead_code)] // TODO - remove
     SpinWrapper(SpinSession),
 }
 
@@ -43,7 +50,7 @@ impl GameBase {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash, Clone, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Hash, Clone, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "game_category", rename_all = "lowercase")]
 pub enum GameCategory {
     Vors,
@@ -74,7 +81,7 @@ pub enum Gender {
     Unknown,
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash, Clone, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Hash, Clone, PartialEq, Eq, sqlx::Type, Copy)]
 #[sqlx(type_name = "game_type", rename_all = "lowercase")]
 pub enum GameType {
     Roulette,
@@ -83,13 +90,6 @@ pub enum GameType {
 }
 
 impl GameType {
-    pub fn table_name(&self) -> &'static str {
-        match self {
-            GameType::Quiz => "quiz_game",
-            GameType::Duel | GameType::Roulette => "spin_game",
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             GameType::Quiz => "quiz",
@@ -106,7 +106,24 @@ impl GameType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Clone)]
+pub struct GameCacheKey {
+    pub page_num: u16,
+    pub game_type: GameType,
+    pub category: Option<GameCategory>,
+}
+
+impl GameCacheKey {
+    pub fn from_query(query: &GamePageQuery) -> Self {
+        Self {
+            page_num: query.page_num,
+            game_type: query.game_type.clone(),
+            category: query.category.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Hash, Clone)]
 pub struct GamePageQuery {
     pub page_num: u16,
     pub game_type: GameType,
@@ -115,7 +132,7 @@ pub struct GamePageQuery {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SavedGamesPageQuery {
-    pub page_num: u8,
+    pub page_num: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

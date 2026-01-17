@@ -7,9 +7,10 @@ use axum::{
     routing::{delete, get, patch, post},
 };
 use reqwest::StatusCode;
+use serde_json::json;
 use uuid::Uuid;
 
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
@@ -28,26 +29,26 @@ use crate::{
         auth::Claims,
         error::ServerError,
         game_base::{
-            CreateGameRequest, GameBase, GameConverter, GamePageQuery, GameType,
+            CreateGameRequest, GameBase, GameCacheKey, GameConverter, GamePageQuery, GameType,
             InitiateGameRequest, InteractiveEnvelope, JsonWrapper, SavedGamesPageQuery,
         },
         quiz_game::QuizSession,
         spin_game::SpinSession,
+        system_log::{LogAction, LogCeverity},
         user::{Permission, SubjectId},
     },
 };
 
-///
 /// NOTE TO SELF
 ///     Some games can be created as interactive games for people to interact
 ///     in the creation of the game. But then the game is a standalone game.
 ///     An example would be quiz, quiz is interactive on creation by adding
 ///     questions but standalone when playing.
+
 pub fn game_routes(state: Arc<AppState>) -> Router {
     let generic_routes = Router::new()
         .route("/page", post(get_games))
-        .route("/{game_type}/create", post(create_interactive_game))
-        .route("/{game_type}/{game_id}", delete(delete_game))
+        .route("/{game_id}", delete(delete_game))
         .route("/free-key/{game_key}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
         .route("/unsave/{game_id}", delete(user_usaved_game))
@@ -63,6 +64,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     let interactive_routes = Router::new()
+        .route("/{game_type}/create", post(create_interactive_game))
         .route(
             "/persist/{game_type}/{game_key}",
             post(persist_interactive_game),
@@ -84,7 +86,7 @@ async fn delete_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
-    Path((game_type, game_id)): Path<(GameType, Uuid)>,
+    Path(game_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(_) | SubjectId::PseudoUser(_) = subject_id {
         return Err(ServerError::AccessDenied);
@@ -94,7 +96,31 @@ async fn delete_game(
         return Err(ServerError::Permission(missing));
     }
 
-    db::game_base::delete_game(state.get_pool(), &game_type, game_id).await?;
+    let deleted_game = db::game_base::delete_game(state.get_pool(), game_id).await?;
+    let cache_pointer = state.get_cache().clone();
+    let state_pointer = state.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = cache_pointer
+            .invalidate_category(deleted_game.game_type, &deleted_game.category)
+            .await
+        {
+            error!("Failed to invalidate cache: {}", e);
+            state_pointer
+                .syslog()
+                .action(LogAction::Delete)
+                .ceverity(LogCeverity::Critical)
+                .function("create_interactive_game")
+                .subject(subject_id)
+                .description("Failed to invalidate cache by category")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_type": deleted_game.game_type,
+                }))
+                .log_async();
+        };
+    });
+
     Ok(StatusCode::OK)
 }
 
@@ -178,7 +204,31 @@ async fn create_interactive_game(
     create_game_base(pool, &game_base).await?;
     info!("Persisted interactive game base");
 
-    let key = vault.create_key(pool, game_type.clone())?;
+    // Invalidate cache for this game type and category
+    let cache = state.get_cache().clone();
+    let category = game_base.category.clone();
+    let game_type_clone = game_type.clone();
+    let state_pointer = state.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = cache.invalidate_category(game_type_clone, &category).await {
+            error!("Failed to invalidate cache: {}", e);
+            state_pointer
+                .syslog()
+                .action(LogAction::Delete)
+                .ceverity(LogCeverity::Critical)
+                .function("create_interactive_game")
+                .subject(subject_id)
+                .description("Failed to invalidate cache by category")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_type": game_type_clone,
+                }))
+                .log_async();
+        }
+    });
+
+    let key = vault.create_key(pool, game_type)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -195,16 +245,14 @@ async fn create_interactive_game(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-// TODO - maybe only one detour to database, make increment return full object? or new fn
 async fn initiate_standalone_game(
     State(state): State<Arc<AppState>>,
-    Extension(_subject_id): Extension<SubjectId>,
+    Extension(subject_id): Extension<SubjectId>,
     Path((game_type, game_id)): Path<(GameType, Uuid)>,
 ) -> Result<impl IntoResponse, ServerError> {
     let wrapper = match game_type {
         GameType::Quiz => {
             let game = get_quiz_game_by_id(state.get_pool(), &game_id).await?;
-            increment_times_played(state.get_pool(), game.id).await?;
             let session = QuizSession::from_game(game);
             JsonWrapper::QuizWrapper(session)
         }
@@ -215,6 +263,30 @@ async fn initiate_standalone_game(
             ));
         }
     };
+
+    tokio::task::spawn(async move {
+        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+            error!(
+                "Failed to increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
+            state
+                .syslog()
+                .action(LogAction::Update)
+                .ceverity(LogCeverity::Warning)
+                .function("initiate_standalone_game")
+                .subject(subject_id)
+                .description("Increment times plated failed on initiate standalone game")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_id": game_id,
+                    "game_type": game_type,
+                }))
+                .log_async();
+        }
+    });
 
     Ok((StatusCode::OK, Json(wrapper)))
 }
@@ -264,8 +336,31 @@ async fn initiate_interactive_game(
         .await?;
 
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.as_str());
-
     let response = InteractiveGameResponse { key, hub_address };
+
+    tokio::task::spawn(async move {
+        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+            error!(
+                "Failed to increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
+            state
+                .syslog()
+                .action(LogAction::Update)
+                .ceverity(LogCeverity::Warning)
+                .function("initiate_interactive_game")
+                .subject(subject_id)
+                .description("Increment times plated failed on initiate standalone game")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_id": game_id,
+                    "game_type": game_type,
+                }))
+                .log_async();
+        }
+    });
 
     Ok((StatusCode::OK, Json(response)))
 }
@@ -279,16 +374,17 @@ async fn get_games(
         return Err(ServerError::AccessDenied);
     }
 
-    // TODO - add back caching: it has a issue not displaying new entries
-    /*
     let cache = state.get_cache();
+    let cache_key = GameCacheKey::from_query(&request);
+    let pool = state.get_pool().clone();
+    let request_clone = request.clone();
 
     let page = cache
-        .get_or(&request, || get_game_page(pool, &request))
+        .get_or(cache_key, async move {
+            get_game_page(&pool, &request_clone).await
+        })
         .await?;
-    */
 
-    let page = get_game_page(state.get_pool(), &request).await?;
     Ok((StatusCode::OK, Json(page)))
 }
 
@@ -303,11 +399,13 @@ pub async fn persist_standalone_game(
         return Err(ServerError::AccessDenied);
     }
 
-    match game_type {
+    let game_id = match game_type {
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
+            let game_id = session.game_id;
             increment_times_played(state.get_pool(), session.game_id).await?;
             create_quiz_game(state.get_pool(), &session.into()).await?;
+            game_id
         }
         _ => {
             return Err(ServerError::Api(
@@ -315,7 +413,31 @@ pub async fn persist_standalone_game(
                 "This game does not have static persist support".into(),
             ));
         }
-    }
+    };
+
+    tokio::task::spawn(async move {
+        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+            error!(
+                "Failed to increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
+            state
+                .syslog()
+                .action(LogAction::Update)
+                .ceverity(LogCeverity::Warning)
+                .function("initiate_standalone_game")
+                .subject(subject_id)
+                .description("Increment times plated failed on initiate stanalone game")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_id": game_id,
+                    "game_type": game_type,
+                }))
+                .log_async();
+        }
+    });
 
     info!("Persisted standalone game");
     Ok(StatusCode::CREATED)
@@ -352,18 +474,44 @@ async fn persist_interactive_game(
     let pool = state.get_pool();
     info!("Removed game key: {}", game_key);
 
-    match game_type {
+    let game_id = match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
-            increment_times_played(pool, session.game_id).await?;
+            let game_id = session.game_id;
             create_spin_game(pool, &session.into()).await?;
+            game_id
         }
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            increment_times_played(pool, session.game_id).await?;
+            let game_id = session.game_id;
             create_quiz_game(pool, &session.into()).await?;
+            game_id
         }
-    }
+    };
+
+    tokio::task::spawn(async move {
+        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+            error!(
+                "Failed to increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
+            state
+                .syslog()
+                .action(LogAction::Update)
+                .ceverity(LogCeverity::Warning)
+                .function("initiate_interactive_game")
+                .subject(subject_id)
+                .description("Increment times plated failed on initiate standalone game")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_id": game_id,
+                    "game_type": game_type,
+                }))
+                .log_async();
+        }
+    });
 
     info!("Persisted interactive specialized game");
     Ok(StatusCode::CREATED)

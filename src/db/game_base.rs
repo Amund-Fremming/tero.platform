@@ -7,7 +7,9 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{GameBase, GamePageQuery, GameType, SavedGamesPageQuery},
+        game_base::{
+            DeleteGameResult, GameBase, GameCategory, GamePageQuery, GameType, SavedGamesPageQuery,
+        },
     },
     service::popup_manager::PagedResponse,
 };
@@ -127,26 +129,28 @@ pub async fn increment_times_played(
     Ok(())
 }
 
-pub async fn delete_game(
-    pool: &Pool<Postgres>,
-    game_type: &GameType,
-    id: Uuid,
-) -> Result<(), ServerError> {
-    let query = format!(
+pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameResult, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    let result = sqlx::query_as!(
+        DeleteGameResult,
         r#"
-        DELETE FROM {}
+        DELETE FROM "game_base"
         WHERE id = $1
+        RETURNING game_type AS "game_type: GameType", category AS "category: GameCategory"
         "#,
-        game_type.table_name()
-    );
+        id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
 
-    let row = sqlx::query(&query).bind(id).execute(pool).await?;
-    if row.rows_affected() == 0 {
-        warn!("Query failed, no game with id: {}", id);
-        return Err(ServerError::Internal("Failed to delete game".into()));
-    }
+    sqlx::query!(r#"DELETE FROM "game_base" WHERE id = $1"#, id)
+        .execute(&mut *tx)
+        .await?;
 
-    Ok(())
+    tx.commit().await?;
+
+    Ok(result)
 }
 
 pub async fn save_game(
@@ -170,7 +174,7 @@ pub async fn save_game(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("User has already saved this game");
+        warn!("User has already saved this game or game does not exist");
     }
 
     Ok(())
@@ -208,7 +212,7 @@ pub async fn get_saved_games_page(
 ) -> Result<PagedResponse<GameBase>, ServerError> {
     let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
-    let offset = query.page_num * page_size;
+    let offset = query.page_num.unwrap_or(0) * page_size;
 
     let query = format!(
         r#"
