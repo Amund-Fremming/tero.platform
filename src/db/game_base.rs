@@ -219,7 +219,6 @@ pub async fn get_saved_games_page(
         SELECT
             base.id,
             base.name,
-            base.description,
             base.game_type,
             base.category,
             base.iterations,
