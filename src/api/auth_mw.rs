@@ -8,8 +8,9 @@ use axum::{
     response::Response,
 };
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode, decode_header};
+use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::{error, info};
+use tracing::info;
 
 use crate::{
     config::config::CONFIG,
@@ -43,7 +44,7 @@ pub async fn auth_mw(
             handle_token_header(state.clone(), &mut req, &token_header).await?;
         }
         _ => {
-            error!("Unauthorized request");
+            tracing::error!("Unauthorized request - no valid authentication header provided");
             return Err(ServerError::AccessDenied);
         }
     };
@@ -90,7 +91,7 @@ async fn handle_token_header(
             let Some(int_name) =
                 IntegrationName::from_subject(&claims.sub, &INTEGRATION_NAMES).await
             else {
-                error!("Unknown integration subject: {}", claims.sub);
+                tracing::error!("Unknown integration subject attempted authentication: {}", claims.sub);
                 return Err(ServerError::AccessDenied);
             };
 
@@ -100,16 +101,18 @@ async fn handle_token_header(
             let Some(base_user) =
                 get_base_user_by_auth0_id(state.get_pool(), claims.auth0_id()).await?
             else {
+                tracing::error!("Failed to find base user for auth0_id {} during authentication", claims.auth0_id());
                 state
                     .syslog()
                     .action(LogAction::Read)
                     .ceverity(LogCeverity::Critical)
                     .function("handle_base_user")
-                    .description("Failed to get base user from auth0 id in middleware")
+                    .description("Auth0 user authenticated but not found in database - sync issue")
+                    .metadata(json!({"auth0_id": claims.auth0_id()}))
                     .log_async();
 
                 return Err(ServerError::Internal(
-                    "Sync error, auth0 id does not exist in out database".into(),
+                    "Authentication sync error - user not found in database".into(),
                 ));
             };
 

@@ -1,6 +1,5 @@
 use chrono::{Duration, Utc};
 use sqlx::{Pool, Postgres};
-use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -8,7 +7,7 @@ use crate::{
     models::{
         error::ServerError,
         game_base::{
-            DeleteGameResult, GameBase, GameCategory, GamePageQuery, GameType, SavedGamesPageQuery,
+            DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery,
         },
     },
     service::popup_manager::PagedResponse,
@@ -17,7 +16,7 @@ use crate::{
 pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
     // newly created games are not played
     let times_played = 0;
-    let row = sqlx::query!(
+    let _row = sqlx::query!(
         r#"
         INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -33,10 +32,7 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
     .execute(pool)
     .await?;
 
-    if row.rows_affected() == 0 {
-        warn!("Skipping game base creation: id already exists")
-    }
-
+    // Ignore duplicate inserts silently - caller doesn't need to know
     Ok(())
 }
 
@@ -119,38 +115,34 @@ pub async fn increment_times_played(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!(
-            "Failed to increment times played to DB with game_id: {}",
-            game_id
-        );
-        return Err(ServerError::NotFound("Game does not exist".into()));
+        return Err(ServerError::NotFound(format!("Game with id {} does not exist", game_id)));
     }
 
     Ok(())
 }
 
 pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameResult, sqlx::Error> {
-    let mut tx = pool.begin().await?;
-
-    let result = sqlx::query_as!(
-        DeleteGameResult,
+    #[derive(sqlx::FromRow)]
+    struct DeleteRow {
+        game_type: crate::models::game_base::GameType,
+        category: crate::models::game_base::GameCategory,
+    }
+    
+    let row = sqlx::query_as::<_, DeleteRow>(
         r#"
         DELETE FROM "game_base"
         WHERE id = $1
-        RETURNING game_type AS "game_type: GameType", category AS "category: GameCategory"
-        "#,
-        id
+        RETURNING game_type, category
+        "#
     )
-    .fetch_one(&mut *tx)
+    .bind(id)
+    .fetch_one(pool)
     .await?;
 
-    sqlx::query!(r#"DELETE FROM "game_base" WHERE id = $1"#, id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
-
-    Ok(result)
+    Ok(DeleteGameResult {
+        game_type: row.game_type,
+        category: row.category,
+    })
 }
 
 pub async fn save_game(
@@ -158,9 +150,8 @@ pub async fn save_game(
     user_id: Uuid,
     game_id: Uuid,
 ) -> Result<(), ServerError> {
-    use tracing::warn;
     let id = Uuid::new_v4();
-    let row = sqlx::query!(
+    let _row = sqlx::query!(
         r#"
         INSERT INTO "saved_game" (id, user_id, base_id)
         VALUES ($1, $2, $3)
@@ -173,10 +164,7 @@ pub async fn save_game(
     .execute(pool)
     .await?;
 
-    if row.rows_affected() == 0 {
-        warn!("User has already saved this game or game does not exist");
-    }
-
+    // Ignore duplicate saves silently - it's idempotent
     Ok(())
 }
 
@@ -197,9 +185,7 @@ pub async fn delete_saved_game(
     .await?;
 
     if row.rows_affected() == 0 {
-        return Err(ServerError::Internal(
-            "Failed to delete from table `saved_game`".into(),
-        ));
+        return Err(ServerError::NotFound(format!("Saved game for user {} and game {} not found", user_id, game_id)));
     }
 
     Ok(())

@@ -1,7 +1,5 @@
 use chrono::Utc;
-use serde_json::json;
 use sqlx::{Pool, Postgres, QueryBuilder, Transaction};
-use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -9,13 +7,12 @@ use crate::{
     models::{
         error::ServerError,
         game_base::Gender,
-        system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
             RecentUserStats,
         },
     },
-    service::{popup_manager::PagedResponse, system_log_builder::SystemLogBuilder},
+    service::popup_manager::PagedResponse,
 };
 
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {
@@ -80,27 +77,8 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
     .execute(pool)
     .await;
 
-    match result {
-        Err(e) => {
-            let _ = SystemLogBuilder::new(pool)
-                .action(LogAction::Create)
-                .ceverity(LogCeverity::Critical)
-                .function("ensure_psuedo_user")
-                .description("Failed to do insert on pseudo user. Should not fail")
-                .metadata(json!({"error": e.to_string()}))
-                .log();
-        }
-        Ok(row) => {
-            if row.rows_affected() != 0 {
-                let _ = SystemLogBuilder::new(pool)
-                    .action(LogAction::Create)
-                    .ceverity(LogCeverity::Warning)
-                    .function("ensure_psuedo_user")
-                    .description("User had pseudo user that did not exist, so a new was created. This will cause ghost users")
-                    .log();
-            }
-        }
-    };
+    // Just ignore result - caller will handle logging if needed
+    let _ = result;
 }
 
 pub async fn get_base_user_by_auth0_id(
@@ -218,8 +196,7 @@ pub async fn update_pseudo_user_activity(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("Query failed, no user with id: {}", id);
-        return Err(ServerError::NotFound("User does not exist".into()));
+        return Err(ServerError::NotFound(format!("User with id {} does not exist", id)));
     }
 
     Ok(())
@@ -277,8 +254,7 @@ pub async fn delete_base_user_by_id(pool: &Pool<Postgres>, id: &Uuid) -> Result<
     .await?;
 
     if result.rows_affected() == 0 {
-        warn!("Query failed, no game with id: {}", id);
-        return Err(ServerError::NotFound("User does not exist".into()));
+        return Err(ServerError::NotFound(format!("User with id {} does not exist", id)));
     }
 
     Ok(())

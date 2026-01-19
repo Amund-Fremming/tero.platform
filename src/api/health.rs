@@ -4,8 +4,6 @@ use axum::{Json, Router, extract::State, response::IntoResponse, routing::get};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use tracing::error;
-
 use crate::{
     db,
     models::{
@@ -35,13 +33,14 @@ async fn health_detailed(
     let session_status = match state.get_gs_client().health_check(state.get_client()).await {
         Ok(_) => true,
         Err(e) => {
-            error!("Failed game session health check: {}", e);
+            tracing::error!("Game session health check failed: {}", e);
             state
                 .syslog()
                 .action(LogAction::Other)
                 .ceverity(LogCeverity::Critical)
                 .function("health_check")
-                .description("Failed health check on tero-session")
+                .description("Game session service (tero-session) health check failed")
+                .metadata(json!({"error": e.to_string()}))
                 .log_async();
 
             false
