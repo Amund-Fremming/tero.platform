@@ -1,5 +1,6 @@
 use chrono::{Duration, Utc};
 use sqlx::{Pool, Postgres};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -16,7 +17,7 @@ use crate::{
 pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
     // newly created games are not played
     let times_played = 0;
-    let _row = sqlx::query!(
+    let row = sqlx::query!(
         r#"
         INSERT INTO "game_base" (id, name, game_type, category, iterations, times_played, last_played)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -32,7 +33,10 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
     .execute(pool)
     .await?;
 
-    // Ignore duplicate inserts silently - caller doesn't need to know
+    if row.rows_affected() == 0 {
+        warn!("Skipping game base creation: id already exists");
+    }
+
     Ok(())
 }
 
@@ -151,7 +155,7 @@ pub async fn save_game(
     game_id: Uuid,
 ) -> Result<(), ServerError> {
     let id = Uuid::new_v4();
-    let _row = sqlx::query!(
+    let row = sqlx::query!(
         r#"
         INSERT INTO "saved_game" (id, user_id, base_id)
         VALUES ($1, $2, $3)
@@ -164,7 +168,10 @@ pub async fn save_game(
     .execute(pool)
     .await?;
 
-    // Ignore duplicate saves silently - it's idempotent
+    if row.rows_affected() == 0 {
+        warn!("User has already saved this game or game does not exist");
+    }
+
     Ok(())
 }
 

@@ -7,7 +7,7 @@ use dashmap::DashMap;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use sqlx::{Pool, Postgres};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     db::key_vault::get_word_sets,
@@ -155,7 +155,10 @@ impl KeyVault {
                 let removed_keys = keys_before - keys_after;
 
                 if removed_keys > 0 {
-                    debug!("Cleaned up {} expired game keys - indicates potential game crash or unexpected exit", removed_keys);
+                    warn!(
+                        "Cleaned up {} expired game keys - indicates potential game crash or unexpected exit",
+                        removed_keys
+                    );
                 }
             }
         });

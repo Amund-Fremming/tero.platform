@@ -1,4 +1,5 @@
 use sqlx::{Pool, Postgres};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::models::{error::ServerError, spin_game::SpinGame};
@@ -18,7 +19,7 @@ pub async fn get_spin_game_by_id(pool: &Pool<Postgres>, id: Uuid) -> Result<Spin
 }
 
 pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<(), ServerError> {
-    let _row = sqlx::query!(
+    let row = sqlx::query!(
         r#"
         INSERT INTO "spin_game" (id, rounds)
         VALUES ($1, $2)
@@ -29,6 +30,9 @@ pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<
     .execute(pool)
     .await?;
 
-    // Ignore duplicate inserts silently - caller doesn't need to know
+    if row.rows_affected() == 0 {
+        warn!("Skipping spin game creation: id already exists");
+    }
+
     Ok(())
 }

@@ -1,5 +1,6 @@
 use chrono::Utc;
 use sqlx::{Pool, Postgres, QueryBuilder, Transaction};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -77,8 +78,16 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
     .execute(pool)
     .await;
 
-    // Just ignore result - caller will handle logging if needed
-    let _ = result;
+    match result {
+        Err(e) => {
+            warn!("Failed to ensure pseudo user exists for id {}: {}", id, e);
+        }
+        Ok(row) => {
+            if row.rows_affected() != 0 {
+                warn!("Pseudo user {} did not exist and was created - potential ghost user", id);
+            }
+        }
+    }
 }
 
 pub async fn get_base_user_by_auth0_id(
