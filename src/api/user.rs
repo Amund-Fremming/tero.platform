@@ -9,7 +9,7 @@ use axum::{
 };
 use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::{
@@ -64,8 +64,11 @@ async fn get_base_user_from_subject(
     };
 
     let Some(user) = get_base_user_by_id(state.get_pool(), user_id).await? else {
-        let error_msg = format!("User with id {} was previously fetched but is now missing - possible sync issue", user_id);
-        tracing::error!("{}", error_msg);
+        let error_msg = format!(
+            "User with id {} was previously fetched but is now missing - possible sync issue",
+            user_id
+        );
+        error!("{}", error_msg);
         state
             .syslog()
             .subject(subject_id)
@@ -106,7 +109,10 @@ async fn ensure_pseudo_user(
     let pool = state.get_pool().clone();
     tokio::spawn(async move {
         if let Err(e) = update_pseudo_user_activity(&pool, pseudo_id).await {
-            tracing::error!("Failed to update pseudo user activity for {}: {}", pseudo_id, e);
+            error!(
+                "Failed to update pseudo user activity for {}: {}",
+                pseudo_id, e
+            );
             _ = state
                 .syslog()
                 .action(LogAction::Update)
@@ -222,7 +228,10 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
                 return;
             }
             Err(e) => {
-                tracing::error!("Failed to fetch base user {} for pseudo user cleanup: {}", pseudo_id, e);
+                error!(
+                    "Failed to fetch base user {} for pseudo user cleanup: {}",
+                    pseudo_id, e
+                );
                 _ = SystemLogBuilder::new(&pool)
                     .action(LogAction::Read)
                     .ceverity(LogCeverity::Warning)
@@ -238,23 +247,18 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
             _ => {}
         };
 
-        let (deleted, error) = match delete_pseudo_user(&pool, pseudo_id).await {
-            Ok(deleted) => (deleted, "no error".to_string()),
-            Err(e) => (false, e.to_string()),
-        };
-
-        if !deleted {
-            tracing::error!("Failed to delete zombie pseudo user {}: {}", pseudo_id, error);
+        if let Err(e) = delete_pseudo_user(&pool, pseudo_id).await {
+            error!("Failed to delete zombie pseudo user {}: {}", pseudo_id, e);
             _ = SystemLogBuilder::new(&pool)
                 .action(LogAction::Delete)
                 .ceverity(LogCeverity::Critical)
                 .function("cleanup_subject_pseudo_id")
                 .description("Failed to delete zombie pseudo user without corresponding base user")
                 .subject(subject_id)
-                .metadata(json!({"pseudo_user_id": pseudo_id, "error": error}))
+                .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
                 .log()
                 .await;
-        }
+        };
     });
 }
 
@@ -282,12 +286,12 @@ async fn get_user_activity_stats(
     Extension(claims): Extension<Claims>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(_) = subject_id else {
-        tracing::error!("Unauthorized guest user or integration attempted to access admin endpoint");
+        error!("Unauthorized guest user or integration attempted to access admin endpoint");
         return Err(ServerError::AccessDenied);
     };
 
     if let Some(missing) = claims.missing_permission([Permission::ReadAdmin]) {
-        tracing::error!("User without admin permissions attempted to access admin endpoint");
+        error!("User without admin permissions attempted to access admin endpoint");
         return Err(ServerError::Permission(missing));
     }
 

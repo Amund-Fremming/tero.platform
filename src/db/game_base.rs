@@ -7,9 +7,7 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{
-            DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery,
-        },
+        game_base::{DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery},
     },
     service::popup_manager::PagedResponse,
 };
@@ -119,25 +117,22 @@ pub async fn increment_times_played(
     .await?;
 
     if row.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!("Game with id {} does not exist", game_id)));
+        return Err(ServerError::NotFound(format!(
+            "Game with id {} does not exist",
+            game_id
+        )));
     }
 
     Ok(())
 }
 
 pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameResult, sqlx::Error> {
-    #[derive(sqlx::FromRow)]
-    struct DeleteRow {
-        game_type: crate::models::game_base::GameType,
-        category: crate::models::game_base::GameCategory,
-    }
-    
-    let row = sqlx::query_as::<_, DeleteRow>(
+    let row = sqlx::query_as::<_, DeleteGameResult>(
         r#"
         DELETE FROM "game_base"
         WHERE id = $1
         RETURNING game_type, category
-        "#
+        "#,
     )
     .bind(id)
     .fetch_one(pool)
@@ -192,7 +187,10 @@ pub async fn delete_saved_game(
     .await?;
 
     if row.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!("Saved game for user {} and game {} not found", user_id, game_id)));
+        return Err(ServerError::NotFound(format!(
+            "Saved game for user {} and game {} not found",
+            user_id, game_id
+        )));
     }
 
     Ok(())

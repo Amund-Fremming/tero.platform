@@ -1,4 +1,5 @@
 use chrono::Utc;
+use serde_json::json;
 use sqlx::{Pool, Postgres, QueryBuilder, Transaction};
 use tracing::warn;
 use uuid::Uuid;
@@ -8,12 +9,13 @@ use crate::{
     models::{
         error::ServerError,
         game_base::Gender,
+        system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
             RecentUserStats,
         },
     },
-    service::popup_manager::PagedResponse,
+    service::{popup_manager::PagedResponse, system_log_builder::SystemLogBuilder},
 };
 
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {
@@ -64,6 +66,7 @@ pub async fn tx_create_pseudo_user(
     .await
 }
 
+/// NOTE: Only db function allowed to write system logs
 pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
     let last_active = Utc::now();
     let result = sqlx::query!(
@@ -80,14 +83,30 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
 
     match result {
         Err(e) => {
+            let _ = SystemLogBuilder::new(pool)
+                .action(LogAction::Create)
+                .ceverity(LogCeverity::Critical)
+                .function("ensure_psuedo_user")
+                .description("Failed to do insert on pseudo user. Should not fail")
+                .metadata(json!({"error": e.to_string()}))
+                .log();
             warn!("Failed to ensure pseudo user exists for id {}: {}", id, e);
         }
         Ok(row) => {
             if row.rows_affected() != 0 {
-                warn!("Pseudo user {} did not exist and was created - potential ghost user", id);
+                let _ = SystemLogBuilder::new(pool)
+                    .action(LogAction::Create)
+                    .ceverity(LogCeverity::Warning)
+                    .function("ensure_psuedo_user")
+                    .description("User had pseudo user that did not exist, so a new was created. This will cause ghost users")
+                    .log();
+                warn!(
+                    "Pseudo user {} did not exist and was created - potential ghost user",
+                    id
+                );
             }
         }
-    }
+    };
 }
 
 pub async fn get_base_user_by_auth0_id(
@@ -205,7 +224,10 @@ pub async fn update_pseudo_user_activity(
     .await?;
 
     if row.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!("User with id {} does not exist", id)));
+        return Err(ServerError::NotFound(format!(
+            "User with id {} does not exist",
+            id
+        )));
     }
 
     Ok(())
@@ -263,7 +285,10 @@ pub async fn delete_base_user_by_id(pool: &Pool<Postgres>, id: &Uuid) -> Result<
     .await?;
 
     if result.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!("User with id {} does not exist", id)));
+        return Err(ServerError::NotFound(format!(
+            "User with id {} does not exist",
+            id
+        )));
     }
 
     Ok(())

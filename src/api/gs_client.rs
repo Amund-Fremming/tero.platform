@@ -1,5 +1,6 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::models::game_base::{GameType, InitiateGameRequest};
 
@@ -68,6 +69,7 @@ impl GSClient {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or("No response body".into());
+            error!("GSClient request failed: {} - {}", status, body);
             return Err(GSClientError::ApiError(status, body));
         }
 
