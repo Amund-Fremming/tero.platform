@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tracing::{error, info};
+use tracing::info;
 
 use axum::{
     Extension, Json, Router,
@@ -35,7 +35,7 @@ async fn get_system_log_page(
     Query(query): Query<SyslogPageQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(_) = subject_id else {
-        error!("Unauthorized subject tried reading system logs");
+        tracing::error!("Unauthorized subject attempted to read system logs");
         return Err(ServerError::AccessDenied);
     };
 
@@ -55,7 +55,7 @@ async fn create_system_log(
 ) -> Result<impl IntoResponse, ServerError> {
     match &subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => {
-            error!("User {} tried writing a system log", id);
+            tracing::error!("User {} attempted to write a system log without permission", id);
             return Err(ServerError::AccessDenied);
         }
         SubjectId::Integration(int_name) => {
@@ -63,7 +63,7 @@ async fn create_system_log(
                 return Err(ServerError::Permission(missing));
             }
 
-            info!("Integration {} is writing a system log", int_name);
+            info!("Integration {} is creating a system log entry", int_name);
         }
     };
 
@@ -100,7 +100,7 @@ async fn get_log_category_count(
     Extension(claims): Extension<Claims>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(_) = subject_id else {
-        error!("Unauthorized subject tried reading log category counts");
+        tracing::error!("Unauthorized subject attempted to read log category counts");
         return Err(ServerError::AccessDenied);
     };
 

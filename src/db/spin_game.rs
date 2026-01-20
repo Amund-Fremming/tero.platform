@@ -31,7 +31,7 @@ pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("Skipping game base creation: id already exists")
+        warn!("Skipping spin game creation: id already exists");
     }
 
     Ok(())

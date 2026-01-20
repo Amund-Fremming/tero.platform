@@ -7,9 +7,7 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{
-            DeleteGameResult, GameBase, GameCategory, GamePageQuery, GameType, SavedGamesPageQuery,
-        },
+        game_base::{DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery},
     },
     service::popup_manager::PagedResponse,
 };
@@ -34,7 +32,7 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("Skipping game base creation: id already exists")
+        warn!("Skipping game base creation: id already exists");
     }
 
     Ok(())
@@ -119,38 +117,31 @@ pub async fn increment_times_played(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!(
-            "Failed to increment times played to DB with game_id: {}",
+        return Err(ServerError::NotFound(format!(
+            "Game with id {} does not exist",
             game_id
-        );
-        return Err(ServerError::NotFound("Game does not exist".into()));
+        )));
     }
 
     Ok(())
 }
 
 pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameResult, sqlx::Error> {
-    let mut tx = pool.begin().await?;
-
-    let result = sqlx::query_as!(
-        DeleteGameResult,
+    let row = sqlx::query_as::<_, DeleteGameResult>(
         r#"
         DELETE FROM "game_base"
         WHERE id = $1
-        RETURNING game_type AS "game_type: GameType", category AS "category: GameCategory"
+        RETURNING game_type, category
         "#,
-        id
     )
-    .fetch_one(&mut *tx)
+    .bind(id)
+    .fetch_one(pool)
     .await?;
 
-    sqlx::query!(r#"DELETE FROM "game_base" WHERE id = $1"#, id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
-
-    Ok(result)
+    Ok(DeleteGameResult {
+        game_type: row.game_type,
+        category: row.category,
+    })
 }
 
 pub async fn save_game(
@@ -158,7 +149,6 @@ pub async fn save_game(
     user_id: Uuid,
     game_id: Uuid,
 ) -> Result<(), ServerError> {
-    use tracing::warn;
     let id = Uuid::new_v4();
     let row = sqlx::query!(
         r#"
@@ -197,9 +187,10 @@ pub async fn delete_saved_game(
     .await?;
 
     if row.rows_affected() == 0 {
-        return Err(ServerError::Internal(
-            "Failed to delete from table `saved_game`".into(),
-        ));
+        return Err(ServerError::NotFound(format!(
+            "Saved game for user {} and game {} not found",
+            user_id, game_id
+        )));
     }
 
     Ok(())

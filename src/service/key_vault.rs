@@ -6,17 +6,12 @@ use std::{
 use dashmap::DashMap;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::{debug, error};
+use tracing::{debug, warn};
 
 use crate::{
     db::key_vault::get_word_sets,
-    models::{
-        game_base::GameType,
-        system_log::{LogAction, LogCeverity},
-    },
-    service::system_log_builder::SystemLogBuilder,
+    models::game_base::GameType,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -87,7 +82,7 @@ impl KeyVault {
 
     pub fn create_key(
         &self,
-        pool: &Pool<Postgres>,
+        _pool: &Pool<Postgres>,
         game_type: GameType,
     ) -> Result<String, KeyVaultError> {
         for _ in 0..100 {
@@ -133,20 +128,13 @@ impl KeyVault {
             }
         }
 
-        SystemLogBuilder::new(pool)
-            .action(LogAction::Create)
-            .ceverity(LogCeverity::Critical)
-            .function("create_key")
-            .description("Library failed to create random id.")
-            .log_async();
-
+        // Failed to find available key after exhaustive search
         Err(KeyVaultError::FullCapasity)
     }
 
-    fn spawn_vault_cleanup(&self, pool: &Pool<Postgres>) {
+    fn spawn_vault_cleanup(&self, _pool: &Pool<Postgres>) {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
         let active_keys = self.active_keys.clone();
-        let pool = pool.clone();
 
         tokio::spawn(async move {
             loop {
@@ -154,14 +142,7 @@ impl KeyVault {
                 debug!("KeyVault is cleaning up its keys");
 
                 let Ok(time) = SystemTime::now().duration_since(UNIX_EPOCH) else {
-                    error!("Failed to obtain system time when cleaning up the vault");
-                    SystemLogBuilder::new(&pool)
-                        .action(LogAction::Other)
-                        .ceverity(LogCeverity::Critical)
-                        .function("spawn_vault_cleanup")
-                        .description("Failed to obtain system time")
-                        .log_async();
-
+                    // Can't get system time - skip this cleanup cycle
                     continue;
                 };
 
@@ -174,15 +155,10 @@ impl KeyVault {
                 let removed_keys = keys_before - keys_after;
 
                 if removed_keys > 0 {
-                    SystemLogBuilder::new(&pool)
-                        .action(LogAction::Delete)
-                        .ceverity(LogCeverity::Warning)
-                        .function("spawn_vault_cleanup")
-                        .description(&format!("Cleaned up {} expired keys", removed_keys))
-                        .metadata(json!({
-                            "warning": "Indicates game crash or unexpected exit - keys should be freed on game start.",              
-                        }))
-                        .log_async();
+                    warn!(
+                        "Cleaned up {} expired game keys - indicates potential game crash or unexpected exit",
+                        removed_keys
+                    );
                 }
             }
         });

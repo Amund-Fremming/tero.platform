@@ -68,7 +68,7 @@ impl GSClient {
 
         let status = response.status();
         if !status.is_success() {
-            let body = response.text().await.unwrap_or("No body".into());
+            let body = response.text().await.unwrap_or("No response body".into());
             error!("GSClient request failed: {} - {}", status, body);
             return Err(GSClientError::ApiError(status, body));
         }

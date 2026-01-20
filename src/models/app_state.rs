@@ -100,10 +100,12 @@ impl AppState {
             loop {
                 interval.tick().await;
                 if let Err(e) = delete_non_active_games(&pool).await {
+                    tracing::error!("Failed to purge inactive games: {}", e);
                     let _ = SystemLogBuilder::new(&pool)
                         .action(LogAction::Delete)
-                        .ceverity(LogCeverity::Info)
-                        .description("Failed to purge inactive games")
+                        .ceverity(LogCeverity::Critical)
+                        .function("spawn_game_cleanup")
+                        .description("Failed to purge inactive games from database")
                         .metadata(json!({"error": e.to_string()}))
                         .log()
                         .await;

@@ -64,17 +64,21 @@ async fn get_base_user_from_subject(
     };
 
     let Some(user) = get_base_user_by_id(state.get_pool(), user_id).await? else {
-        error!("Unexpected: user id was previously fetched but is now missing.");
+        let error_msg = format!(
+            "User with id {} was previously fetched but is now missing - possible sync issue",
+            user_id
+        );
+        error!("{}", error_msg);
         state
             .syslog()
             .subject(subject_id)
             .action(LogAction::Read)
             .ceverity(LogCeverity::Critical)
             .function("get_user_from_subject")
-            .description("Unexpected: user id was previously fetched but is now missing.")
+            .description(&error_msg)
             .log_async();
 
-        return Err(ServerError::NotFound("User not found".into()));
+        return Err(ServerError::NotFound(error_msg));
     };
 
     let wrapped = match claims.missing_permission([Permission::ReadAdmin, Permission::WriteAdmin]) {
@@ -105,13 +109,17 @@ async fn ensure_pseudo_user(
     let pool = state.get_pool().clone();
     tokio::spawn(async move {
         if let Err(e) = update_pseudo_user_activity(&pool, pseudo_id).await {
+            error!(
+                "Failed to update pseudo user activity for {}: {}",
+                pseudo_id, e
+            );
             _ = state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
                 .function("ensure_pseudo_user")
-                .description("Failed to update pseudo user activity")
-                .metadata(json!({"error": e.to_string()}))
+                .description("Failed to update pseudo user last activity timestamp")
+                .metadata(json!({"pseudo_id": pseudo_id, "error": e.to_string()}))
                 .log()
                 .await;
         };
@@ -220,12 +228,16 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
                 return;
             }
             Err(e) => {
+                error!(
+                    "Failed to fetch base user {} for pseudo user cleanup: {}",
+                    pseudo_id, e
+                );
                 _ = SystemLogBuilder::new(&pool)
                     .action(LogAction::Read)
                     .ceverity(LogCeverity::Warning)
                     .function("cleanup_subject_pseudo_id")
-                    .description("Failed to fetch base user for pseudo user cleanup")
-                    .subject(subject_id)
+                    .description("Failed to verify base user existence during pseudo user cleanup")
+                    .subject(subject_id.clone())
                     .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
                     .log()
                     .await;
@@ -235,22 +247,18 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
             _ => {}
         };
 
-        let (deleted, error) = match delete_pseudo_user(&pool, pseudo_id).await {
-            Ok(deleted) => (deleted, "no error".to_string()),
-            Err(e) => (false, e.to_string()),
-        };
-
-        if !deleted {
+        if let Err(e) = delete_pseudo_user(&pool, pseudo_id).await {
+            error!("Failed to delete zombie pseudo user {}: {}", pseudo_id, e);
             _ = SystemLogBuilder::new(&pool)
-                .action(LogAction::Read)
+                .action(LogAction::Delete)
                 .ceverity(LogCeverity::Critical)
                 .function("cleanup_subject_pseudo_id")
-                .description("Failed to fetch base user for pseudo user cleanup")
+                .description("Failed to delete zombie pseudo user without corresponding base user")
                 .subject(subject_id)
-                .metadata(json!({"pseudo_user_id": pseudo_id, "error": error}))
+                .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
                 .log()
                 .await;
-        }
+        };
     });
 }
 
@@ -278,12 +286,12 @@ async fn get_user_activity_stats(
     Extension(claims): Extension<Claims>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(_) = subject_id else {
-        error!("Unauthorized guest user or integration tried accessing admin endpoint");
+        error!("Unauthorized guest user or integration attempted to access admin endpoint");
         return Err(ServerError::AccessDenied);
     };
 
     if let Some(missing) = claims.missing_permission([Permission::ReadAdmin]) {
-        error!("Unauthorized user tried accessing admin endpoint");
+        error!("User without admin permissions attempted to access admin endpoint");
         return Err(ServerError::Permission(missing));
     }
 

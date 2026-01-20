@@ -105,17 +105,18 @@ async fn delete_game(
             .invalidate(deleted_game.game_type, &deleted_game.category)
             .await
         {
-            error!("Failed to invalidate cache: {}", e);
+            tracing::error!("Failed to invalidate cache after deleting game {}: {}", game_id, e);
             state_pointer
                 .syslog()
                 .action(LogAction::Delete)
                 .ceverity(LogCeverity::Critical)
-                .function("create_interactive_game")
+                .function("delete_game")
                 .subject(subject_id)
-                .description("Failed to invalidate cache by category")
+                .description("Failed to invalidate game cache after deletion")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_type": deleted_game.game_type,
+                    "game_id": game_id,
                 }))
                 .log_async();
         };
@@ -130,7 +131,7 @@ async fn join_interactive_game(
     Path(key_word): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
-        error!("Integration {} tried accessing user endpoint", id);
+        tracing::error!("Integration {} attempted to access user-only endpoint", id);
         return Err(ServerError::AccessDenied);
     }
 
@@ -212,14 +213,14 @@ async fn create_interactive_game(
 
     tokio::spawn(async move {
         if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            error!("Failed to invalidate cache: {}", e);
+            tracing::error!("Failed to invalidate cache after creating game {}: {}", game_base.id, e);
             state_pointer
                 .syslog()
-                .action(LogAction::Delete)
+                .action(LogAction::Create)
                 .ceverity(LogCeverity::Critical)
                 .function("create_interactive_game")
                 .subject(subject_id)
-                .description("Failed to invalidate cache by category")
+                .description("Failed to invalidate game cache after creation")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_type": game_type_clone,
@@ -266,19 +267,14 @@ async fn initiate_standalone_game(
 
     tokio::task::spawn(async move {
         if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
-            error!(
-                "Failed to increment times played for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
+            tracing::error!("Failed to increment times played for {} {}: {}", game_type.as_str(), game_id, e);
             state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
                 .function("initiate_standalone_game")
                 .subject(subject_id)
-                .description("Increment times plated failed on initiate standalone game")
+                .description("Failed to increment game play counter for standalone game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -340,7 +336,7 @@ async fn initiate_interactive_game(
 
     tokio::task::spawn(async move {
         if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
-            error!(
+            tracing::error!(
                 "Failed to increment times played for {} {}: {}",
                 game_type.as_str(),
                 game_id,
@@ -352,7 +348,7 @@ async fn initiate_interactive_game(
                 .ceverity(LogCeverity::Warning)
                 .function("initiate_interactive_game")
                 .subject(subject_id)
-                .description("Increment times plated failed on initiate standalone game")
+                .description("Failed to increment game play counter for interactive game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -371,6 +367,7 @@ async fn get_games(
     Json(request): Json<GamePageQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(_) = subject_id {
+        tracing::error!("Integration attempted to access game listing endpoint");
         return Err(ServerError::AccessDenied);
     }
 
@@ -395,7 +392,7 @@ pub async fn persist_standalone_game(
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
-        error!("Integration {} tried to store a static game", id);
+        tracing::error!("Integration {} attempted to store a static game", id);
         return Err(ServerError::AccessDenied);
     }
 
@@ -417,19 +414,14 @@ pub async fn persist_standalone_game(
 
     tokio::task::spawn(async move {
         if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
-            error!(
-                "Failed to increment times played for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
+            tracing::error!("Failed to increment times played for {} {}: {}", game_type.as_str(), game_id, e);
             state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
-                .function("initiate_standalone_game")
+                .function("persist_standalone_game")
                 .subject(subject_id)
-                .description("Increment times plated failed on initiate stanalone game")
+                .description("Failed to increment game play counter after persisting standalone game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -451,7 +443,7 @@ async fn persist_interactive_game(
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
-        error!("User tried to persist game session");
+        tracing::error!("Non-integration user attempted to persist game session");
         return Err(ServerError::AccessDenied);
     };
 
@@ -524,7 +516,7 @@ async fn free_game_key(
     Path(game_key): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
-        error!("User tried to free game keys/word");
+        tracing::error!("Non-integration user attempted to free game keys");
         return Err(ServerError::AccessDenied);
     };
 

@@ -1,6 +1,6 @@
 use sqlx::{Pool, Postgres};
 
-use tracing::error;
+use tracing::warn;
 
 use crate::{
     db::system_log::create_system_log,
@@ -107,9 +107,9 @@ impl SystemLogBuilder {
 
     pub fn log_async(self) {
         tokio::spawn(async move {
-            self.log().await.map_err(|e| {
-                error!("Failed to system log async: {}", e);
-            })
+            if let Err(e) = self.log().await {
+                warn!("Failed to create system log entry: {}", e);
+            }
         });
     }
 }
