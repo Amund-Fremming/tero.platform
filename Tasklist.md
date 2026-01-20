@@ -171,8 +171,6 @@
 
 - [ ] Patch user should chech for unique username and show error
 
-LEFT OFF
+**After release?**
 
-- fixing quiz create quiz game and db fucntions
-- missing into from session for quiz game
-- in spin game add if conflcics just increment for quiz game also????
+- [ ] Microservice for auth0 to receive events and store in log if it cannot reach main backend. When backend is good an buffer is not empty, batch create
