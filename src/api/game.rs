@@ -10,7 +10,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
@@ -18,8 +18,8 @@ use crate::{
     db::{
         self,
         game_base::{
-            create_game_base, delete_saved_game, get_game_page, get_saved_games_page,
-            increment_times_played, save_game,
+            create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
+            sync_and_increment_times_played,
         },
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
         spin_game::{create_spin_game, get_spin_game_by_id},
@@ -105,7 +105,11 @@ async fn delete_game(
             .invalidate(deleted_game.game_type, &deleted_game.category)
             .await
         {
-            tracing::error!("Failed to invalidate cache after deleting game {}: {}", game_id, e);
+            tracing::error!(
+                "Failed to invalidate cache after deleting game {}: {}",
+                game_id,
+                e
+            );
             state_pointer
                 .syslog()
                 .action(LogAction::Delete)
@@ -139,9 +143,10 @@ async fn join_interactive_game(
     let tuple = match (words.first(), words.get(1)) {
         (Some(p), Some(s)) => (p.to_string(), s.to_string()),
         _ => {
+            warn!("Key word in invalid format");
             return Err(ServerError::Api(
-                StatusCode::BAD_REQUEST,
-                "Key word in invalid format".into(),
+                StatusCode::NOT_FOUND,
+                "Game with game key does not exist".into(),
             ));
         }
     };
@@ -213,7 +218,11 @@ async fn create_interactive_game(
 
     tokio::spawn(async move {
         if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            tracing::error!("Failed to invalidate cache after creating game {}: {}", game_base.id, e);
+            tracing::error!(
+                "Failed to invalidate cache after creating game {}: {}",
+                game_base.id,
+                e
+            );
             state_pointer
                 .syslog()
                 .action(LogAction::Create)
@@ -266,15 +275,20 @@ async fn initiate_standalone_game(
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
-            tracing::error!("Failed to increment times played for {} {}: {}", game_type.as_str(), game_id, e);
+        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+            tracing::error!(
+                "Failed to sync and increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
             state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
                 .function("initiate_standalone_game")
                 .subject(subject_id)
-                .description("Failed to increment game play counter for standalone game")
+                .description("Failed to sync and increment game play counter for standalone game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -335,9 +349,9 @@ async fn initiate_interactive_game(
     let response = InteractiveGameResponse { key, hub_address };
 
     tokio::task::spawn(async move {
-        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
             tracing::error!(
-                "Failed to increment times played for {} {}: {}",
+                "Failed to sync and increment times played for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -348,7 +362,7 @@ async fn initiate_interactive_game(
                 .ceverity(LogCeverity::Warning)
                 .function("initiate_interactive_game")
                 .subject(subject_id)
-                .description("Failed to increment game play counter for interactive game")
+                .description("Failed to sync and increment game play counter for interactive game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -400,7 +414,6 @@ pub async fn persist_standalone_game(
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let game_id = session.game_id;
-            increment_times_played(state.get_pool(), session.game_id).await?;
             create_quiz_game(state.get_pool(), &session.into()).await?;
             game_id
         }
@@ -413,15 +426,22 @@ pub async fn persist_standalone_game(
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
-            tracing::error!("Failed to increment times played for {} {}: {}", game_type.as_str(), game_id, e);
+        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+            tracing::error!(
+                "Failed to sync and increment times played for {} {}: {}",
+                game_type.as_str(),
+                game_id,
+                e
+            );
             state
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
                 .function("persist_standalone_game")
                 .subject(subject_id)
-                .description("Failed to increment game play counter after persisting standalone game")
+                .description(
+                    "Failed to sync and increment game play counter after persisting standalone game",
+                )
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -435,6 +455,7 @@ pub async fn persist_standalone_game(
     Ok(StatusCode::CREATED)
 }
 
+/// Only called by `tero.session`.
 async fn persist_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
@@ -482,9 +503,9 @@ async fn persist_interactive_game(
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
             error!(
-                "Failed to increment times played for {} {}: {}",
+                "Failed to sync and increment times played for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -493,9 +514,9 @@ async fn persist_interactive_game(
                 .syslog()
                 .action(LogAction::Update)
                 .ceverity(LogCeverity::Warning)
-                .function("initiate_interactive_game")
-                .subject(subject_id)
-                .description("Increment times plated failed on initiate standalone game")
+                .function("persist_interactive_game")
+                .subject(subject_id.clone())
+                .description("Sync and increment times plated failed")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,

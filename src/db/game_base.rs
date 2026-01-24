@@ -75,9 +75,10 @@ pub async fn get_game_page(
             category,
             iterations,
             times_played,
-            last_played
+            last_played,
+            synced
         FROM "game_base"
-        WHERE game_type = '{}' {}
+        WHERE game_type = '{}' {} AND synced = true
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
@@ -100,14 +101,14 @@ pub async fn get_game_page(
     Ok(page)
 }
 
-pub async fn increment_times_played(
+pub async fn sync_and_increment_times_played(
     pool: &Pool<Postgres>,
     game_id: Uuid,
 ) -> Result<(), ServerError> {
     let row = sqlx::query!(
         r#"
         UPDATE "game_base"
-        SET times_played = times_played + 1, last_played = $1
+        SET times_played = times_played + 1, last_played = $1, synced = true
         WHERE id = $2
         "#,
         Utc::now(),

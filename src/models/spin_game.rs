@@ -48,7 +48,7 @@ pub struct SpinSession {
 
 impl SpinSession {
     pub fn new_duel(host_id: Uuid, game_id: Uuid) -> Self {
-        Self::from_request(host_id, game_id, 1)
+        Self::from_request(host_id, game_id, 2)
     }
 
     pub fn new_roulette(host_id: Uuid, game_id: Uuid) -> Self {

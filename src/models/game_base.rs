@@ -34,6 +34,7 @@ pub struct GameBase {
     pub iterations: i32,
     pub times_played: i32,
     pub last_played: DateTime<Utc>,
+    pub synced: bool,
 }
 
 impl GameBase {
@@ -46,6 +47,7 @@ impl GameBase {
             iterations: 0,
             times_played: 0,
             last_played: Utc::now(),
+            synced: false,
         }
     }
 }
