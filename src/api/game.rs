@@ -472,20 +472,20 @@ async fn persist_interactive_game(
         return Err(ServerError::Permission(missing));
     }
 
-    let words: Vec<&str> = game_key.split(" ").collect();
-    let tuple = match (words.first(), words.get(1)) {
-        (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
-        _ => {
-            return Err(ServerError::Api(
-                StatusCode::BAD_REQUEST,
-                "Key word in invalid format".into(),
-            ));
-        }
-    };
+    // let words: Vec<&str> = game_key.split(" ").collect();
+    // let tuple = match (words.first(), words.get(1)) {
+    //     (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
+    //     _ => {
+    //         return Err(ServerError::Api(
+    //             StatusCode::BAD_REQUEST,
+    //             "Key word in invalid format".into(),
+    //         ));
+    //     }
+    // };
 
-    state.get_vault().remove_key(tuple);
+    // state.get_vault().remove_key(tuple);
+    // info!("Removed game key: {}", game_key);
     let pool = state.get_pool();
-    info!("Removed game key: {}", game_key);
 
     let game_id = match game_type {
         GameType::Roulette | GameType::Duel => {
