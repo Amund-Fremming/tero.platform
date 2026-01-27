@@ -55,7 +55,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .route("/saved", get(get_saved_games))
         .with_state(state.clone());
 
-    let standalone_routes = Router::new()
+    let static_routes = Router::new()
         .route(
             "/{game_type}/initiate/{game_id}",
             get(initiate_standalone_game),
@@ -63,12 +63,9 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .route("/persist/{game_type}", post(persist_standalone_game))
         .with_state(state.clone());
 
-    let interactive_routes = Router::new()
+    let session_routes = Router::new()
         .route("/{game_type}/create", post(create_interactive_game))
-        .route(
-            "/persist/{game_type}/{game_key}",
-            post(persist_interactive_game),
-        )
+        .route("/persist/{game_type}", post(persist_interactive_game))
         .route(
             "/{game_type}/initiate/{game_id}",
             post(initiate_interactive_game),
@@ -78,8 +75,8 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
 
     Router::new()
         .nest("/general", generic_routes)
-        .nest("/static", standalone_routes)
-        .nest("/session", interactive_routes)
+        .nest("/static", static_routes)
+        .nest("/session", session_routes)
 }
 
 async fn delete_game(
@@ -345,7 +342,7 @@ async fn initiate_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.as_str());
+    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse { key, hub_address };
 
     tokio::task::spawn(async move {
@@ -460,7 +457,7 @@ async fn persist_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
-    Path((game_type, game_key)): Path<(GameType, String)>,
+    Path(game_type): Path<GameType>,
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
@@ -472,19 +469,6 @@ async fn persist_interactive_game(
         return Err(ServerError::Permission(missing));
     }
 
-    // let words: Vec<&str> = game_key.split(" ").collect();
-    // let tuple = match (words.first(), words.get(1)) {
-    //     (Some(prefix), Some(suffix)) => (prefix.to_string(), suffix.to_string()),
-    //     _ => {
-    //         return Err(ServerError::Api(
-    //             StatusCode::BAD_REQUEST,
-    //             "Key word in invalid format".into(),
-    //         ));
-    //     }
-    // };
-
-    // state.get_vault().remove_key(tuple);
-    // info!("Removed game key: {}", game_key);
     let pool = state.get_pool();
 
     let game_id = match game_type {
@@ -536,12 +520,16 @@ async fn free_game_key(
     Extension(claims): Extension<Claims>,
     Path(game_key): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
+    info!("free_game_key endpoint called with key: '{}'", game_key);
+    info!("Subject: {:?}", subject_id);
+
     let SubjectId::Integration(_) = subject_id else {
         tracing::error!("Non-integration user attempted to free game keys");
         return Err(ServerError::AccessDenied);
     };
 
     if let Some(missing) = claims.missing_permission([Permission::WriteGame]) {
+        error!("Missing permission: {:?}", missing);
         return Err(ServerError::Permission(missing));
     }
 
@@ -556,7 +544,7 @@ async fn free_game_key(
         }
     };
 
-    info!("Game key freed: {}", game_key);
+    info!("Game key released: {}", game_key);
     state.get_vault().remove_key(tuple);
     Ok(StatusCode::OK)
 }

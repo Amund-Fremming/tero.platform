@@ -10,7 +10,6 @@ use axum::{
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode, decode_header};
 use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::info;
 
 use crate::{
     config::config::CONFIG,
@@ -61,9 +60,7 @@ async fn handle_pseudo_user(
 
     let pool_clone = pool.clone();
     tokio::task::spawn(async move { ensure_pseudo_user(&pool_clone, pseudo_id).await });
-
     let subject = SubjectId::PseudoUser(pseudo_id);
-    info!("Request by subject: {:?}", subject);
 
     request.extensions_mut().insert(subject);
     request.extensions_mut().insert(Claims::empty());
@@ -91,7 +88,10 @@ async fn handle_token_header(
             let Some(int_name) =
                 IntegrationName::from_subject(&claims.sub, &INTEGRATION_NAMES).await
             else {
-                tracing::error!("Unknown integration subject attempted authentication: {}", claims.sub);
+                tracing::error!(
+                    "Unknown integration subject attempted authentication: {}",
+                    claims.sub
+                );
                 return Err(ServerError::AccessDenied);
             };
 
@@ -101,7 +101,10 @@ async fn handle_token_header(
             let Some(base_user) =
                 get_base_user_by_auth0_id(state.get_pool(), claims.auth0_id()).await?
             else {
-                tracing::error!("Failed to find base user for auth0_id {} during authentication", claims.auth0_id());
+                tracing::error!(
+                    "Failed to find base user for auth0_id {} during authentication",
+                    claims.auth0_id()
+                );
                 state
                     .syslog()
                     .action(LogAction::Read)
@@ -120,7 +123,6 @@ async fn handle_token_header(
         }
     };
 
-    info!("Request by subject: {:?}", subject);
     request.extensions_mut().insert(claims);
     request.extensions_mut().insert(subject);
 
