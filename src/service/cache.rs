@@ -12,8 +12,7 @@ use crate::models::{
 /// INFO:
 ///     I accepted that the eviction on max cache size will make the cache inconsistent.
 ///     A game might not appear or appear twice, but will be conistent after the ttl.
-
-// Approximate 20MB with ~10k entries
+///      Approximate 20MB with ~10k entries
 pub static MAX_CACHE_ENTRIES: u64 = 10_000;
 
 #[derive(Debug, Clone)]
@@ -40,9 +39,7 @@ impl<T: Clone + Send + Sync + 'static> GustCache<T> {
     {
         match self
             .cache
-            .try_get_with(key, async {
-                on_failure.await.map_err(|e| ServerError::from(e))
-            })
+            .try_get_with(key, async { on_failure.await.map_err(ServerError::from) })
             .await
         {
             Ok(entry) => Ok(entry),

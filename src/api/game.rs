@@ -44,7 +44,6 @@ use crate::{
 ///     in the creation of the game. But then the game is a standalone game.
 ///     An example would be quiz, quiz is interactive on creation by adding
 ///     questions but standalone when playing.
-
 pub fn game_routes(state: Arc<AppState>) -> Router {
     let generic_routes = Router::new()
         .route("/page", post(get_games))
@@ -210,7 +209,7 @@ async fn create_interactive_game(
     // Invalidate cache for this game type and category
     let cache = state.get_cache().clone();
     let category = game_base.category.clone();
-    let game_type_clone = game_type.clone();
+    let game_type_clone = game_type;
     let state_pointer = state.clone();
 
     tokio::spawn(async move {
@@ -332,7 +331,7 @@ async fn initiate_interactive_game(
         }
     };
 
-    let key = vault.create_key(pool, game_type.clone())?;
+    let key = vault.create_key(pool, game_type)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -411,7 +410,7 @@ pub async fn persist_standalone_game(
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let game_id = session.game_id;
-            create_quiz_game(state.get_pool(), &session.into()).await?;
+            create_quiz_game(state.get_pool(), &session).await?;
             game_id
         }
         _ => {
@@ -481,7 +480,7 @@ async fn persist_interactive_game(
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let game_id = session.game_id;
-            create_quiz_game(pool, &session.into()).await?;
+            create_quiz_game(pool, &session).await?;
             game_id
         }
     };

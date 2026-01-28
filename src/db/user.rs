@@ -83,7 +83,7 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
 
     match result {
         Err(e) => {
-            let _ = SystemLogBuilder::new(pool)
+            _ = SystemLogBuilder::new(pool)
                 .action(LogAction::Create)
                 .ceverity(LogCeverity::Critical)
                 .function("ensure_psuedo_user")
@@ -94,7 +94,7 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
         }
         Ok(row) => {
             if row.rows_affected() != 0 {
-                let _ = SystemLogBuilder::new(pool)
+                _ = SystemLogBuilder::new(pool)
                     .action(LogAction::Create)
                     .ceverity(LogCeverity::Warning)
                     .function("ensure_psuedo_user")
@@ -158,7 +158,7 @@ pub async fn create_base_user(
     auth0_user: &Auth0User,
 ) -> Result<Uuid, ServerError> {
     let email = auth0_user.email.clone().unwrap_or("Kenneth".to_string());
-    let split = email.splitn(2, '@').next().unwrap_or("Kenneth").to_string();
+    let split = email.split('@').next().unwrap_or("Kenneth").to_string();
 
     let username = match &auth0_user.username {
         Some(username) => username.to_string(),
@@ -375,11 +375,15 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
     let total_user_count_fut =
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user").fetch_one(pool);
 
+    type RecentStatsResult = Result<RecentUserStats, sqlx::Error>;
+    type AverageStatsResult = Result<AverageUserStats, sqlx::Error>;
+    type StatsResult = Result<Option<i64>, sqlx::Error>;
+
     let (recent, average, total_game_count, total_user_count): (
-        Result<RecentUserStats, sqlx::Error>,
-        Result<AverageUserStats, sqlx::Error>,
-        Result<Option<i64>, sqlx::Error>,
-        Result<Option<i64>, sqlx::Error>,
+        RecentStatsResult,
+        AverageStatsResult,
+        StatsResult,
+        StatsResult,
     ) = tokio::join!(
         recent_fut,
         average_fut,

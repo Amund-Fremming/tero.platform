@@ -9,10 +9,7 @@ use rand_chacha::ChaCha8Rng;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, warn};
 
-use crate::{
-    db::key_vault::get_word_sets,
-    models::game_base::GameType,
-};
+use crate::{db::key_vault::get_word_sets, models::game_base::GameType};
 
 #[derive(Debug, thiserror::Error)]
 pub enum KeyVaultError {
@@ -63,7 +60,7 @@ impl KeyVault {
 
     pub fn key_active(&self, key: &(String, String)) -> Option<GameType> {
         match self.active_keys.get(key) {
-            Some(value) => Some(value.game_type.clone()),
+            Some(value) => Some(value.game_type),
             None => None,
         }
     }

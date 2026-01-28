@@ -17,11 +17,11 @@ pub struct SpinGame {
     pub rounds: Vec<String>,
 }
 
-impl Into<SpinGame> for SpinSession {
-    fn into(self) -> SpinGame {
-        SpinGame {
-            id: self.game_id,
-            rounds: self.rounds,
+impl From<SpinSession> for SpinGame {
+    fn from(value: SpinSession) -> Self {
+        Self {
+            id: value.game_id,
+            rounds: value.rounds,
         }
     }
 }

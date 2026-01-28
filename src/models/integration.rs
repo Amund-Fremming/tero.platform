@@ -36,10 +36,7 @@ impl IntegrationName {
         subject: &str,
         integrations: &Mutex<HashMap<String, IntegrationName>>,
     ) -> Option<IntegrationName> {
-        let Some(stripped) = subject.strip_suffix("@clients") else {
-            return None;
-        };
-
+        let stripped = subject.strip_suffix("@clients")?;
         let lock = integrations.lock().await;
         lock.get(stripped).cloned()
     }

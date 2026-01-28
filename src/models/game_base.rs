@@ -119,7 +119,7 @@ impl GameCacheKey {
     pub fn from_query(query: &GamePageQuery) -> Self {
         Self {
             page_num: query.page_num,
-            game_type: query.game_type.clone(),
+            game_type: query.game_type,
             category: query.category.clone(),
         }
     }

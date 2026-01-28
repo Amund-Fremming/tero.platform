@@ -15,11 +15,11 @@ pub struct QuizGame {
     pub questions: Vec<String>,
 }
 
-impl Into<QuizGame> for QuizSession {
-    fn into(self) -> QuizGame {
-        QuizGame {
-            id: self.game_id,
-            questions: self.questions,
+impl From<QuizSession> for QuizGame {
+    fn from(value: QuizSession) -> Self {
+        Self {
+            id: value.game_id,
+            questions: value.questions,
         }
     }
 }
