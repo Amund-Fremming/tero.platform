@@ -6,7 +6,7 @@ use tracing::{debug, error};
 
 use crate::models::{
     error::ServerError,
-    game_base::{GameCacheKey, GameCategory, GameType},
+    game::{GameCacheKey, GameCategory, GameType},
 };
 
 /// INFO:

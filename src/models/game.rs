@@ -153,3 +153,8 @@ pub struct InitiateGameRequest {
     pub key: String,
     pub value: serde_json::Value,
 }
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct RandomGame {
+    //
+}

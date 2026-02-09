@@ -69,6 +69,10 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             "/{game_type}/initiate/{game_id}",
             post(initiate_interactive_game),
         )
+        .route(
+            "/{game_type}/initiate-random/{game_id}",
+            post(initiate_random_interactive_game),
+        )
         .route("/join/{game_id}", post(join_interactive_game))
         .with_state(state.clone());
 
@@ -369,6 +373,19 @@ async fn initiate_interactive_game(
     });
 
     Ok((StatusCode::OK, Json(response)))
+}
+
+async fn initiate_random_interactive_game(
+    State(state): State<Arc<AppState>>,
+    Extension(subject_id): Extension<SubjectId>,
+    Path((game_type, game_id)): Path<(GameType, Uuid)>,
+) -> Result<impl IntoResponse, ServerError> {
+    let user_id = match subject_id {
+        SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
+        _ => return Err(ServerError::AccessDenied),
+    };
+
+    let game = 
 }
 
 async fn get_games(

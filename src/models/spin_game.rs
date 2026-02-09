@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game_base::GameConverter;
+use crate::models::game::GameConverter;
 
 impl GameConverter for SpinSession {
     fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {

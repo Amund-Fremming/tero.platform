@@ -9,7 +9,7 @@ use rand_chacha::ChaCha8Rng;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, warn};
 
-use crate::{db::key_vault::get_word_sets, models::game_base::GameType};
+use crate::{db::key_vault::get_word_sets, models::game::GameType};
 
 #[derive(Debug, thiserror::Error)]
 pub enum KeyVaultError {

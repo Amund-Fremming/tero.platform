@@ -2,7 +2,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{game_base::Gender, integration::IntegrationName};
+use crate::models::{game::Gender, integration::IntegrationName};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListUsersQuery {

@@ -12,7 +12,7 @@ use crate::{
     models::{
         auth::Jwks,
         error::ServerError,
-        game_base::GameBase,
+        game::GameBase,
         system_log::{LogAction, LogCeverity},
     },
     service::{

@@ -3,6 +3,7 @@ pub mod game_tip;
 pub mod health;
 pub mod key_vault;
 pub mod quiz_game;
+pub mod random_game;
 pub mod spin_game;
 pub mod system_log;
 pub mod user;

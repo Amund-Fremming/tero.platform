@@ -7,7 +7,7 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery},
+        game::{DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery},
     },
     service::popup_manager::PagedResponse,
 };

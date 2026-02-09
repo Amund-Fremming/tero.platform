@@ -2,7 +2,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::models::game_base::{GameType, InitiateGameRequest};
+use crate::models::game::{GameType, InitiateGameRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GSClientError {
