@@ -14,7 +14,8 @@
               "Enum": [
                 "roulette",
                 "duel",
-                "quiz"
+                "quiz",
+                "imposter"
               ]
             }
           }

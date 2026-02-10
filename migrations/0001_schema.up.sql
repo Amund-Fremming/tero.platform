@@ -4,7 +4,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE "game_type" AS ENUM (
     'roulette',
     'duel',
-    'quiz'
+    'quiz',
+    'imposter'
 );
 
 CREATE TYPE "integration_name" AS ENUM (
@@ -120,13 +121,27 @@ CREATE TABLE "game_base" (
 
 CREATE TABLE "quiz_game" (
     "id" UUID PRIMARY KEY,
-    "questions" TEXT[] NOT NULL
+    "rounds" TEXT[] NOT NULL
 );
 
 CREATE TABLE "spin_game" (
     "id" UUID PRIMARY KEY,
     "rounds" TEXT[] NOT NULL
 );
+
+CREATE TABLE "imposter_game" (
+    "id" UUID PRIMARY KEY,
+    "rounds" TEXT[] NOT NULL
+);
+
+CREATE TABLE "random_game" (
+    "id" BIGSERIAL PRIMARY KEY,
+    "game_id" UUID NOT NULL,
+    "rounds" TEXT[] NOT NULL,
+    "game_type" game_type NOT NULL
+);
+
+CREATE INDEX "idx_random_game_id_game_type" ON "random_game" ("id", "game_type");
 
 CREATE INDEX "idx_saved_game_id" ON "saved_game" ("id");
 CREATE INDEX "idx_saved_game_delete_keys" ON "saved_game" ("id", "user_id");
@@ -161,4 +176,8 @@ FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;
 
 ALTER TABLE "spin_game"
 ADD CONSTRAINT "fk_spin_game_base" 
+FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;
+
+ALTER TABLE "imposter_game"
+ADD CONSTRAINT "fk_imposter_game_base" 
 FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;

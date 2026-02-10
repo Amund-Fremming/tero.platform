@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game::GameConverter;
+use crate::models::game_base::{GameConverter, RandomGame};
 
 impl GameConverter for SpinSession {
-    fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(self)
     }
 }
@@ -28,6 +28,7 @@ impl From<SpinSession> for SpinGame {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SpinGameState {
+    Created,
     Initialized,
     RoundStarted,
     RoundInProgress,
@@ -59,11 +60,31 @@ impl SpinSession {
         Self {
             game_id,
             host_id,
-            state: SpinGameState::Initialized,
+            state: SpinGameState::Created,
             current_iteration: 0,
             selection_size,
             rounds: vec![],
             players: HashMap::from([(host_id, 0)]),
+        }
+    }
+
+    pub fn from_random_duel(user_id: Uuid, game: RandomGame) -> Self {
+        Self::from_random_game(user_id, game, 2)
+    }
+
+    pub fn from_random_roulette(user_id: Uuid, game: RandomGame) -> Self {
+        Self::from_random_game(user_id, game, 1)
+    }
+
+    fn from_random_game(user_id: Uuid, game: RandomGame, selection_size: i32) -> Self {
+        Self {
+            game_id: game.game_id,
+            host_id: user_id,
+            state: SpinGameState::Initialized,
+            current_iteration: 0,
+            selection_size,
+            rounds: game.rounds,
+            players: HashMap::from([(user_id, 0)]),
         }
     }
 

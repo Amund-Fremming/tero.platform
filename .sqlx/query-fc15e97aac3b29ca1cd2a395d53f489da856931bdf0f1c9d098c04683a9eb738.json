@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"imposter_game\" (\"id\", \"rounds\")\n        VALUES ($1, $2); \n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fc15e97aac3b29ca1cd2a395d53f489da856931bdf0f1c9d098c04683a9eb738"
+}

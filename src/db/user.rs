@@ -8,7 +8,7 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game::Gender,
+        game_base::Gender,
         system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,

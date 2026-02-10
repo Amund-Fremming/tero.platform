@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"game_base\"\n        SET times_played = times_played + 1, last_played = $1, synced = true\n        WHERE id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0d76bda81be3037b074496a48e1105b488636c37fe2bbfead2352be262778f64"
+}

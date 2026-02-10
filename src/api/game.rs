@@ -6,11 +6,13 @@ use axum::{
     response::IntoResponse,
     routing::{delete, get, patch, post},
 };
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
@@ -19,8 +21,9 @@ use crate::{
         self,
         game_base::{
             create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
-            sync_and_increment_times_played,
+            sync_and_increment_times_played, take_random_game,
         },
+        imposter_game::create_imposter_game,
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
         spin_game::{create_spin_game, get_spin_game_by_id},
     },
@@ -30,8 +33,9 @@ use crate::{
         error::ServerError,
         game_base::{
             CreateGameRequest, GameBase, GameCacheKey, GameConverter, GamePageQuery, GameType,
-            InitiateGameRequest, InteractiveEnvelope, JsonWrapper, SavedGamesPageQuery,
+            InitiateGameRequest, InteractiveEnvelope, ResponseWrapper, SavedGamesPageQuery,
         },
+        imposter_game::ImposterSession,
         quiz_game::QuizSession,
         spin_game::SpinSession,
         system_log::{LogAction, LogCeverity},
@@ -70,8 +74,8 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             post(initiate_interactive_game),
         )
         .route(
-            "/{game_type}/initiate-random/{game_id}",
-            post(initiate_random_interactive_game),
+            "/{game_type}/initiate-random",
+            post(create_random_interactive_game),
         )
         .route("/join/{game_id}", post(join_interactive_game))
         .with_state(state.clone());
@@ -183,28 +187,32 @@ async fn create_interactive_game(
         _ => return Err(ServerError::AccessDenied),
     };
 
-    let client = state.get_client();
-    let gs_client = state.get_gs_client();
-    let vault = state.get_vault();
-    let pool = state.get_pool();
-
     let (value, game_base) = match game_type {
         GameType::Roulette => {
             let game_base = GameBase::from_request(&request, GameType::Roulette);
-            let session_json = SpinSession::new_roulette(user_id, game_base.id).to_json_value()?;
+            let session_json = SpinSession::new_roulette(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
         GameType::Duel => {
             let game_base = GameBase::from_request(&request, GameType::Duel);
-            let session_json = SpinSession::new_duel(user_id, game_base.id).to_json_value()?;
+            let session_json = SpinSession::new_duel(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
         GameType::Quiz => {
             let game_base = GameBase::from_request(&request, GameType::Quiz);
-            let session_json = QuizSession::new(game_base.id).to_json_value()?;
+            let session_json = QuizSession::new(game_base.id).to_json()?;
+            (session_json, game_base)
+        }
+        GameType::Imposter => {
+            let game_base = GameBase::from_request(&request, GameType::Imposter);
+            let session_json = ImposterSession::new(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
     };
+
+    let client = state.get_client();
+    let gs_client = state.get_gs_client();
+    let pool = state.get_pool();
 
     // Store game base
     create_game_base(pool, &game_base).await?;
@@ -238,12 +246,12 @@ async fn create_interactive_game(
         }
     });
 
-    let key = vault.create_key(pool, game_type)?;
+    let key = state.get_vault().create_key(pool, game_type)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
     };
-    info!("Created key: {}", key);
+    debug!("Created key: {}", key);
 
     gs_client
         .initiate_game_session(client, &game_type, &payload)
@@ -264,7 +272,7 @@ async fn initiate_standalone_game(
         GameType::Quiz => {
             let game = get_quiz_game_by_id(state.get_pool(), &game_id).await?;
             let session = QuizSession::from_game(game);
-            JsonWrapper::QuizWrapper(session)
+            ResponseWrapper::Quiz(session)
         }
         _ => {
             return Err(ServerError::Api(
@@ -320,12 +328,12 @@ async fn initiate_interactive_game(
         GameType::Roulette => {
             let game = get_spin_game_by_id(pool, game_id).await?;
             let session = SpinSession::from_duel(user_id, game);
-            session.to_json_value()?
+            session.to_json()?
         }
         GameType::Duel => {
             let game = get_spin_game_by_id(pool, game_id).await?;
             let session = SpinSession::from_roulette(user_id, game);
-            session.to_json_value()?
+            session.to_json()?
         }
         _ => {
             return Err(ServerError::Api(
@@ -375,17 +383,114 @@ async fn initiate_interactive_game(
     Ok((StatusCode::OK, Json(response)))
 }
 
-async fn initiate_random_interactive_game(
+async fn create_random_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Path((game_type, game_id)): Path<(GameType, Uuid)>,
+    Path(game_type): Path<GameType>,
 ) -> Result<impl IntoResponse, ServerError> {
     let user_id = match subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
         _ => return Err(ServerError::AccessDenied),
     };
 
-    let game = 
+    let mut rng = ChaCha8Rng::from_os_rng();
+    let len = rng.random_range(4..=7);
+    let response = state
+        .get_client()
+        .get(format!(
+            "https://random-word-api.herokuapp.com/word?length={}",
+            len
+        ))
+        .send()
+        .await?;
+    let status = response.status();
+
+    let name = if !status.is_success() {
+        let msg = response.text().await.unwrap_or("No body".to_string());
+        error!("Random name api call failed: {} - {}", status, msg);
+        format!("Rand{}", len)
+    } else {
+        let names: Vec<String> = response.json().await?;
+        names[0].clone()
+    };
+
+    let request = CreateGameRequest::new(name);
+    let game = take_random_game(state.get_pool(), &game_type).await?;
+
+    let (value, game_base) = match game_type {
+        GameType::Roulette => {
+            let game_base = GameBase::from_request(&request, GameType::Roulette);
+            let session_json = SpinSession::from_random_roulette(user_id, game).to_json()?;
+            (session_json, game_base)
+        }
+        GameType::Duel => {
+            let game_base = GameBase::from_request(&request, GameType::Duel);
+            let session_json = SpinSession::from_random_duel(user_id, game).to_json()?;
+            (session_json, game_base)
+        }
+        GameType::Quiz => {
+            let game_base = GameBase::from_request(&request, GameType::Quiz);
+            let session_json = QuizSession::from_random(game).to_json()?;
+            (session_json, game_base)
+        }
+        GameType::Imposter => {
+            let game_base = GameBase::from_request(&request, GameType::Imposter);
+            let session_json = ImposterSession::from_random(user_id, game).to_json()?;
+            (session_json, game_base)
+        }
+    };
+
+    let client = state.get_client();
+    let gs_client = state.get_gs_client();
+    let pool = state.get_pool();
+
+    // Store game base
+    create_game_base(pool, &game_base).await?;
+    info!("Persisted interactive game base from random game");
+
+    // Invalidate cache for this game type and category
+    let cache = state.get_cache().clone();
+    let category = game_base.category.clone();
+    let game_type_clone = game_type;
+    let state_pointer = state.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = cache.invalidate(game_type_clone, &category).await {
+            tracing::error!(
+                "Failed to invalidate cache after creating random game {}: {}",
+                game_base.id,
+                e
+            );
+            state_pointer
+                .syslog()
+                .action(LogAction::Create)
+                .ceverity(LogCeverity::Critical)
+                .function("create_random_interactive_game")
+                .subject(subject_id)
+                .description("Failed to invalidate game cache after random creation")
+                .metadata(json!({
+                    "error": e.to_string(),
+                    "game_type": game_type_clone,
+                }))
+                .log_async();
+        }
+    });
+
+    let key = state.get_vault().create_key(pool, game_type)?;
+    let payload = InitiateGameRequest {
+        key: key.clone(),
+        value,
+    };
+    debug!("Created key: {}", key);
+
+    gs_client
+        .initiate_game_session(client, &game_type, &payload)
+        .await?;
+
+    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
+    let response = InteractiveGameResponse { key, hub_address };
+
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 async fn get_games(
@@ -427,7 +532,7 @@ pub async fn persist_standalone_game(
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let game_id = session.game_id;
-            create_quiz_game(state.get_pool(), &session).await?;
+            create_quiz_game(state.get_pool(), &session.into()).await?;
             game_id
         }
         _ => {
@@ -497,7 +602,13 @@ async fn persist_interactive_game(
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
             let game_id = session.game_id;
-            create_quiz_game(pool, &session).await?;
+            create_quiz_game(pool, &session.into()).await?;
+            game_id
+        }
+        GameType::Imposter => {
+            let session: ImposterSession = serde_json::from_value(request.payload)?;
+            let game_id = session.game_id;
+            create_imposter_game(pool, &session.into()).await?;
             game_id
         }
     };

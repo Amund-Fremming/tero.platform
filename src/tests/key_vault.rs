@@ -5,7 +5,7 @@ mod tests {
     use dotenvy::dotenv;
 
     use crate::{
-        models::{app_state::AppState, game::GameType},
+        models::{app_state::AppState, game_base::GameType},
         service::key_vault::KeyVaultError,
     };
 

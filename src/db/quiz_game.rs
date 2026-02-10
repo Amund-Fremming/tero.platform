@@ -1,10 +1,7 @@
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
-use crate::models::{
-    error::ServerError,
-    quiz_game::{QuizGame, QuizSession},
-};
+use crate::models::{error::ServerError, quiz_game::QuizGame};
 
 pub async fn get_quiz_game_by_id(
     pool: &Pool<Postgres>,
@@ -29,10 +26,7 @@ pub async fn get_quiz_game_by_id(
     Ok(game)
 }
 
-pub async fn create_quiz_game(
-    pool: &Pool<Postgres>,
-    session: &QuizSession,
-) -> Result<(), ServerError> {
+pub async fn create_quiz_game(pool: &Pool<Postgres>, game: &QuizGame) -> Result<(), ServerError> {
     sqlx::query!(
         r#"
         INSERT INTO "quiz_game" (id, questions)
@@ -40,8 +34,8 @@ pub async fn create_quiz_game(
         ON CONFLICT (id) DO UPDATE SET
             questions = EXCLUDED.questions
         "#,
-        session.game_id,
-        &session.questions
+        game.id,
+        &game.rounds
     )
     .execute(pool)
     .await?;

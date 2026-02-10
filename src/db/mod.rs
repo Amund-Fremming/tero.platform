@@ -1,9 +1,9 @@
 pub mod game_base;
 pub mod game_tip;
 pub mod health;
+pub mod imposter_game;
 pub mod key_vault;
 pub mod quiz_game;
-pub mod random_game;
 pub mod spin_game;
 pub mod system_log;
 pub mod user;

@@ -1,4 +1,6 @@
 use chrono::{Duration, Utc};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use sqlx::{Pool, Postgres};
 use tracing::warn;
 use uuid::Uuid;
@@ -7,7 +9,9 @@ use crate::{
     config::config::CONFIG,
     models::{
         error::ServerError,
-        game::{DeleteGameResult, GameBase, GamePageQuery, SavedGamesPageQuery},
+        game_base::{
+            DeleteGameResult, GameBase, GamePageQuery, GameType, RandomGame, SavedGamesPageQuery,
+        },
     },
     service::popup_manager::PagedResponse,
 };
@@ -237,4 +241,24 @@ pub async fn get_saved_games_page(
     let page = PagedResponse::new(games, has_next);
 
     Ok(page)
+}
+
+pub async fn take_random_game(
+    pool: &Pool<Postgres>,
+    game_type: &GameType,
+) -> Result<RandomGame, sqlx::Error> {
+    let mut rng = ChaCha8Rng::from_os_rng();
+    let len = rng.random_range(4..=7);
+
+    sqlx::query_as!(
+        RandomGame,
+        r#"
+        DELETE FROM "random_game"
+        WHERE id = $1
+        RETURNING id, game_type, rounds 
+    "#,
+        random_id
+    )
+    .execute(pool)
+    .await
 }

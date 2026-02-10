@@ -1,8 +1,9 @@
 pub mod app_state;
 pub mod auth;
 pub mod error;
-pub mod game;
+pub mod game_base;
 pub mod game_tip;
+pub mod imposter_game;
 pub mod integration;
 pub mod quiz_game;
 pub mod spin_game;

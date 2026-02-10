@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game::GameConverter;
+use crate::models::game_base::{GameConverter, RandomGame};
 
 impl GameConverter for QuizSession {
-    fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(self)
     }
 }
@@ -12,14 +12,14 @@ impl GameConverter for QuizSession {
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct QuizGame {
     pub id: Uuid,
-    pub questions: Vec<String>,
+    pub rounds: Vec<String>,
 }
 
 impl From<QuizSession> for QuizGame {
     fn from(value: QuizSession) -> Self {
         Self {
             id: value.game_id,
-            questions: value.questions,
+            rounds: value.rounds,
         }
     }
 }
@@ -28,7 +28,7 @@ impl From<QuizSession> for QuizGame {
 pub struct QuizSession {
     pub game_id: Uuid,
     pub current_iteration: i32,
-    pub questions: Vec<String>,
+    pub rounds: Vec<String>,
 }
 
 impl QuizSession {
@@ -36,7 +36,7 @@ impl QuizSession {
         Self {
             game_id,
             current_iteration: 0,
-            questions: vec![],
+            rounds: vec![],
         }
     }
 
@@ -44,7 +44,15 @@ impl QuizSession {
         Self {
             game_id: game.id,
             current_iteration: 0,
-            questions: game.questions,
+            rounds: game.rounds,
+        }
+    }
+
+    pub fn from_random(game: RandomGame) -> Self {
+        Self {
+            game_id: game.game_id,
+            current_iteration: 0,
+            rounds: game.rounds,
         }
     }
 }

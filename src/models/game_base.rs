@@ -5,10 +5,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{quiz_game::QuizSession, spin_game::SpinSession};
+use crate::models::{
+    imposter_game::ImposterSession, quiz_game::QuizSession, spin_game::SpinSession,
+};
 
 pub trait GameConverter {
-    fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error>;
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error>;
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -19,10 +21,10 @@ pub struct DeleteGameResult {
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub enum JsonWrapper {
-    QuizWrapper(QuizSession),
-    #[allow(dead_code)] // TODO - remove
-    SpinWrapper(SpinSession),
+pub enum ResponseWrapper {
+    Quiz(QuizSession),
+    Spin(SpinSession),
+    Imposter(ImposterSession),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
@@ -89,6 +91,7 @@ pub enum GameType {
     Roulette,
     Duel,
     Quiz,
+    Imposter,
 }
 
 impl GameType {
@@ -97,6 +100,7 @@ impl GameType {
             GameType::Quiz => "quiz",
             GameType::Duel => "duel",
             GameType::Roulette => "roulette",
+            GameType::Imposter => "imposter",
         }
     }
 
@@ -104,6 +108,7 @@ impl GameType {
         match self {
             GameType::Quiz => "quiz",
             GameType::Duel | GameType::Roulette => "spin",
+            GameType::Imposter => "imposter",
         }
     }
 }
@@ -148,6 +153,15 @@ pub struct CreateGameRequest {
     pub category: GameCategory,
 }
 
+impl CreateGameRequest {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            category: GameCategory::All,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitiateGameRequest {
     pub key: String,
@@ -156,5 +170,8 @@ pub struct InitiateGameRequest {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct RandomGame {
-    //
+    pub id: i64,
+    pub game_id: Uuid,
+    pub rounds: Vec<String>,
+    pub game_type: GameType,
 }

@@ -5,8 +5,11 @@ ALTER TABLE IF EXISTS "saved_game" DROP CONSTRAINT IF EXISTS "fk_saved_game_user
 ALTER TABLE IF EXISTS "saved_game" DROP CONSTRAINT IF EXISTS "fk_saved_game_base";
 ALTER TABLE IF EXISTS "quiz_game" DROP CONSTRAINT IF EXISTS "fk_quiz_game_base";
 ALTER TABLE IF EXISTS "spin_game" DROP CONSTRAINT IF EXISTS "fk_spin_game_base";
+ALTER TABLE IF EXISTS "imposter_game" DROP CONSTRAINT IF EXISTS "fk_spin_game_base";
 
 -- Drop indexes
+DROP INDEX IF EXISTS "idx_random_game_id_game_type";
+
 DROP INDEX IF EXISTS "idx_saved_game_id";
 
 DROP INDEX IF EXISTS "idx_system_log_ceverity";
@@ -29,15 +32,15 @@ DROP INDEX IF EXISTS "idx_base_user_auth0_id";
 DROP TABLE IF EXISTS "saved_game";
 DROP TABLE IF EXISTS "quiz_game";
 DROP TABLE IF EXISTS "spin_game";
-DROP TABLE IF EXISTS "spin_game_round";
+DROP TABLE IF EXISTS "imposter_game";
 DROP TABLE IF EXISTS "system_log";
 DROP TABLE IF EXISTS "integration";
-DROP TABLE IF EXISTS "join_key";
 DROP TABLE IF EXISTS "prefix_word";
 DROP TABLE IF EXISTS "suffix_word";
 DROP TABLE IF EXISTS "base_user";
 DROP TABLE IF EXISTS "pseudo_user";
 DROP TABLE IF EXISTS "game_base";
+DROP TABLE IF EXISTS "random_game";
 
 -- Drop types
 DROP TYPE IF EXISTS "integration_name";
