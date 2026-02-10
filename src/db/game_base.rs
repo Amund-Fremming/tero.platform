@@ -248,17 +248,20 @@ pub async fn take_random_game(
     game_type: &GameType,
 ) -> Result<RandomGame, sqlx::Error> {
     let mut rng = ChaCha8Rng::from_os_rng();
-    let len = rng.random_range(4..=7);
+    let random_id = rng.random_range(4..=7);
+
+    // TODO! get biggest id by getting last inserted, then get 5-10 random ids, just so i get one with one db trip, if not found, try again
 
     sqlx::query_as!(
         RandomGame,
         r#"
         DELETE FROM "random_game"
-        WHERE id = $1
-        RETURNING id, game_type, rounds 
+        WHERE id = $1 AND game_type = $2
+        RETURNING id, game_id, rounds, game_type AS "game_type: GameType" 
     "#,
-        random_id
+        random_id,
+        game_type as _
     )
-    .execute(pool)
+    .fetch_one(pool)
     .await
 }

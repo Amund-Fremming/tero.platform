@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM \"random_game\"\n        WHERE id = $1 AND game_type = $2\n        RETURNING id, game_id, rounds, game_type AS \"game_type: GameType\" \n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "game_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "rounds",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "game_type: GameType",
+        "type_info": {
+          "Custom": {
+            "name": "game_type",
+            "kind": {
+              "Enum": [
+                "roulette",
+                "duel",
+                "quiz",
+                "imposter"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        {
+          "Custom": {
+            "name": "game_type",
+            "kind": {
+              "Enum": [
+                "roulette",
+                "duel",
+                "quiz",
+                "imposter"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2ce993c85adaf2d14f2680b1a9b43f510714d9bf67ad712a96806fe8f4c0cdae"
+}

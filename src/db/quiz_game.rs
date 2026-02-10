@@ -10,7 +10,7 @@ pub async fn get_quiz_game_by_id(
     let game = sqlx::query_as!(
         QuizGame,
         r#"
-        SELECT id, questions
+        SELECT id, rounds 
         FROM "quiz_game" 
         WHERE id = $1
         "#,
@@ -29,10 +29,10 @@ pub async fn get_quiz_game_by_id(
 pub async fn create_quiz_game(pool: &Pool<Postgres>, game: &QuizGame) -> Result<(), ServerError> {
     sqlx::query!(
         r#"
-        INSERT INTO "quiz_game" (id, questions)
+        INSERT INTO "quiz_game" (id, rounds)
         VALUES ($1, $2)
         ON CONFLICT (id) DO UPDATE SET
-            questions = EXCLUDED.questions
+            rounds = EXCLUDED.rounds
         "#,
         game.id,
         &game.rounds

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, questions\n        FROM \"quiz_game\" \n        WHERE id = $1\n        ",
+  "query": "\n        SELECT id, rounds \n        FROM \"quiz_game\" \n        WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "questions",
+        "name": "rounds",
         "type_info": "TextArray"
       }
     ],
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "45e4fc50e6c2fcd1cbcf2511c2f54174f072f625cf5f243790b5485296251aa4"
+  "hash": "e8a54e0f20ca1a408a2b61956197301bf417f03d89c637f2eae464c647ec1232"
 }

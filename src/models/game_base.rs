@@ -19,6 +19,7 @@ pub struct DeleteGameResult {
     pub category: GameCategory,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResponseWrapper {
@@ -168,6 +169,7 @@ pub struct InitiateGameRequest {
     pub value: serde_json::Value,
 }
 
+#[allow(dead_code)] // TODO!
 #[derive(Debug, sqlx::FromRow)]
 pub struct RandomGame {
     pub id: i64,
