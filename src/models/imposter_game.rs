@@ -30,9 +30,7 @@ impl From<ImposterSession> for ImposterGame {
 pub enum ImposterGameState {
     Created,
     Initialized,
-    RoundStarted,
-    RoundInProgress,
-    RoundFinished,
+    Started,
     Finished,
 }
 
