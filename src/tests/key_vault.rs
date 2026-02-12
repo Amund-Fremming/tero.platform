@@ -5,8 +5,8 @@ mod tests {
     use dotenvy::dotenv;
 
     use crate::{
-        models::{app_state::AppState, game_base::GameType},
-        service::key_vault::KeyVaultError,
+        common::{app_state::AppState, services::key_vault::KeyVaultError},
+        features::game::models::GameType,
     };
 
     async fn setup_app_state() -> Arc<AppState> {

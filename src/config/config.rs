@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::models::integration::IntegrationConfig;
+use crate::common::integration::IntegrationConfig;
 
 pub static CONFIG: Lazy<AppConfig> =
     Lazy::new(|| AppConfig::load().unwrap_or_else(|e| panic!("{}", e)));
