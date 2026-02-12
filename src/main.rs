@@ -2,32 +2,29 @@ use std::collections::HashMap;
 
 use axum::{Router, middleware::from_fn_with_state, routing::post};
 use dotenvy::dotenv;
-use models::app_state::AppState;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
-    api::{
-        auth_mw::auth_mw,
-        game::game_routes,
-        game_tip::{protected_game_tip_routes, public_game_tip_routes},
-        health::health_routes,
-        system_log::log_routes,
-        user::{auth0_trigger_endpoint, protected_auth_routes, public_auth_routes},
-        webhook_mw::webhook_mw,
-    },
-    config::config::CONFIG,
-    models::{
+    common::{
+        app_state::AppState,
         error::ServerError,
         integration::{INTEGRATION_NAMES, IntegrationName},
+        middleware::{auth::auth_mw, webhook::webhook_mw},
+    },
+    config::config::CONFIG,
+    features::{
+        game::handlers::game_routes,
+        game_tip::handlers::{protected_game_tip_routes, public_game_tip_routes},
+        health::handlers::health_routes,
+        system_log::handlers::log_routes,
+        user::handlers::{auth0_trigger_endpoint, protected_auth_routes, public_auth_routes},
     },
 };
 
-mod api;
+mod common;
 mod config;
-mod db;
-mod models;
-mod service;
+mod features;
 mod tests;
 
 #[tokio::main]

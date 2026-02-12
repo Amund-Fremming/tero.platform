@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"quiz_game\" (id, rounds)\n        VALUES ($1, $2)\n        ON CONFLICT (id) DO UPDATE SET\n            rounds = EXCLUDED.rounds\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f3997aee498b16a4fdb73a76767e8ae1b8fd8d7fe6881f1b047efc38bcf5c517"
+}
