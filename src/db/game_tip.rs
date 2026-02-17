@@ -3,7 +3,7 @@ use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{
         error::ServerError,
         game_tip::{CreateGameTipRequest, GameTip},

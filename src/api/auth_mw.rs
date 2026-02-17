@@ -10,9 +10,10 @@ use axum::{
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode, decode_header};
 use serde_json::json;
 use sqlx::{Pool, Postgres};
+use tracing::warn;
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     db::user::{ensure_pseudo_user, get_base_user_by_auth0_id},
     models::{
         app_state::AppState,
@@ -43,7 +44,7 @@ pub async fn auth_mw(
             handle_token_header(state.clone(), &mut req, &token_header).await?;
         }
         _ => {
-            tracing::error!("Unauthorized request - no valid authentication header provided");
+            warn!("Unauthorized request - no valid authentication header provided");
             return Err(ServerError::AccessDenied);
         }
     };
@@ -88,7 +89,7 @@ async fn handle_token_header(
             let Some(int_name) =
                 IntegrationName::from_subject(&claims.sub, &INTEGRATION_NAMES).await
             else {
-                tracing::error!(
+                warn!(
                     "Unknown integration subject attempted authentication: {}",
                     claims.sub
                 );
@@ -129,7 +130,6 @@ async fn handle_token_header(
     Ok(())
 }
 
-// Warning: 65% AI generated code
 async fn verify_jwt(token: &str, jwks: &Jwks) -> Result<TokenData<serde_json::Value>, ServerError> {
     let header = decode_header(token)
         .map_err(|e| ServerError::JwtVerification(format!("Failed to decode header: {}", e)))?;

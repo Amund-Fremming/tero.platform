@@ -5,20 +5,22 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{delete, get, post, put},
+    routing::{get, patch, post, put},
 };
+
+use crate::api::validation::ValidatedJson;
 use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
     db::{
         self,
         user::{
-            create_base_user, create_pseudo_user, delete_base_user_by_id, delete_pseudo_user,
-            get_base_user_by_id, list_base_users, patch_base_user_by_id, pseudo_user_exists,
-            tx_create_pseudo_user, update_pseudo_user_activity,
+            create_base_user, create_pseudo_user, delete_pseudo_user, get_base_user_by_id,
+            list_base_users, patch_base_user_by_id, pseudo_user_exists, tx_create_pseudo_user,
+            update_pseudo_user_activity,
         },
     },
     models::{
@@ -45,7 +47,7 @@ pub fn protected_auth_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(list_all_users))
         .route("/me", get(get_base_user_from_subject))
-        .route("/{user_id}", delete(delete_user).patch(patch_user))
+        .route("/{user_id}", patch(patch_user))
         .route("/activity-stats", get(get_user_activity_stats))
         .route("/popups", put(update_client_popup))
         .with_state(state)
@@ -133,7 +135,7 @@ async fn patch_user(
     Extension(subject): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
     Path(user_id): Path<Uuid>,
-    Json(request): Json<PatchUserRequest>,
+    ValidatedJson(request): ValidatedJson<PatchUserRequest>,
 ) -> Result<Response, ServerError> {
     let SubjectId::BaseUser(uid) = subject else {
         return Err(ServerError::AccessDenied);
@@ -155,32 +157,6 @@ async fn patch_user(
 
     let user = patch_base_user_by_id(state.get_pool(), &uid, request).await?;
     Ok((StatusCode::OK, Json(user)).into_response())
-}
-
-async fn delete_user(
-    State(state): State<Arc<AppState>>,
-    Extension(subject_id): Extension<SubjectId>,
-    Extension(claims): Extension<Claims>,
-    Path(user_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ServerError> {
-    let SubjectId::BaseUser(actual_user_id) = subject_id else {
-        return Err(ServerError::AccessDenied);
-    };
-
-    if claims
-        .missing_permission([Permission::WriteAdmin])
-        .is_none()
-    {
-        delete_base_user_by_id(state.get_pool(), &user_id).await?;
-        return Ok(StatusCode::OK);
-    }
-
-    if actual_user_id != user_id {
-        return Err(ServerError::AccessDenied);
-    }
-
-    delete_base_user_by_id(state.get_pool(), &actual_user_id).await?;
-    Ok(StatusCode::OK)
 }
 
 pub async fn auth0_trigger_endpoint(
@@ -262,7 +238,7 @@ fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: S
     });
 }
 
-pub async fn list_all_users(
+async fn list_all_users(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
@@ -286,12 +262,12 @@ async fn get_user_activity_stats(
     Extension(claims): Extension<Claims>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(_) = subject_id else {
-        error!("Unauthorized guest user or integration attempted to access admin endpoint");
+        warn!("Unauthorized guest user or integration attempted to access admin endpoint");
         return Err(ServerError::AccessDenied);
     };
 
     if let Some(missing) = claims.missing_permission([Permission::ReadAdmin]) {
-        error!("User without admin permissions attempted to access admin endpoint");
+        warn!("User without admin permissions attempted to access admin endpoint");
         return Err(ServerError::Permission(missing));
     }
 

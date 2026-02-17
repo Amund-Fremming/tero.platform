@@ -2,7 +2,7 @@ use chrono::Utc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{
         error::ServerError,
         system_log::{

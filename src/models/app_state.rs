@@ -4,10 +4,11 @@ use serde_json::json;
 
 use reqwest::Client;
 use sqlx::{Pool, Postgres};
+use tracing::warn;
 
 use crate::{
     api::gs_client::GSClient,
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     db::game_base::delete_non_active_games,
     models::{
         auth::Jwks,
@@ -100,10 +101,10 @@ impl AppState {
             loop {
                 interval.tick().await;
                 if let Err(e) = delete_non_active_games(&pool).await {
-                    tracing::error!("Failed to purge inactive games: {}", e);
+                    warn!("Failed to purge inactive games: {}", e);
                     let _ = SystemLogBuilder::new(&pool)
                         .action(LogAction::Delete)
-                        .ceverity(LogCeverity::Critical)
+                        .ceverity(LogCeverity::Warning)
                         .function("spawn_game_cleanup")
                         .description("Failed to purge inactive games from database")
                         .metadata(json!({"error": e.to_string()}))

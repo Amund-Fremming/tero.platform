@@ -16,7 +16,7 @@ use crate::{
         user::{auth0_trigger_endpoint, protected_auth_routes, public_auth_routes},
         webhook_mw::webhook_mw,
     },
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{
         error::ServerError,
         integration::{INTEGRATION_NAMES, IntegrationName},

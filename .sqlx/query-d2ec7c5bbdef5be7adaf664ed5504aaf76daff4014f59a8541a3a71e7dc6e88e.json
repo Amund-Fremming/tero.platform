@@ -25,10 +25,10 @@
             "name": "game_category",
             "kind": {
               "Enum": [
-                "vors",
-                "ladies",
+                "girls",
                 "boys",
-                "all"
+                "mixed",
+                "innercircle"
               ]
             }
           }

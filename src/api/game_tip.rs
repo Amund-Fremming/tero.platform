@@ -8,6 +8,7 @@ use axum::{
 };
 use axum_valid::Valid;
 use reqwest::StatusCode;
+use tracing::warn;
 
 use crate::{
     db,
@@ -52,7 +53,7 @@ async fn get_game_tips_admin(
 ) -> Result<impl IntoResponse, ServerError> {
     // Only admins can fetch game tips
     let SubjectId::BaseUser(_) = subject_id else {
-        tracing::error!("Unauthorized subject attempted to read game tips");
+        warn!("Unauthorized subject attempted to read game tips");
         return Err(ServerError::AccessDenied);
     };
 

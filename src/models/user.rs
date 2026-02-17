@@ -1,6 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::models::{game_base::Gender, integration::IntegrationName};
 
@@ -72,11 +73,14 @@ pub enum UserRole {
     BaseUser(BaseUser),
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Validate)]
 pub struct PatchUserRequest {
+    #[validate(custom(function = "crate::api::validation::validate_username"))]
     pub username: Option<String>,
     pub gender: Option<Gender>,
+    #[validate(custom(function = "crate::api::validation::validate_person_name"))]
     pub family_name: Option<String>,
+    #[validate(custom(function = "crate::api::validation::validate_person_name"))]
     pub given_name: Option<String>,
     pub birth_date: Option<NaiveDate>,
 }

@@ -2,7 +2,7 @@ use std::{collections::HashSet, time::SystemTimeError};
 
 use axum::{http::StatusCode, response::IntoResponse};
 use thiserror::Error;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{
     api::gs_client::GSClientError, models::user::Permission, service::key_vault::KeyVaultError,
@@ -29,7 +29,7 @@ pub enum ServerError {
     NotFound(String),
 
     #[error("Request error: {0}")]
-    Request(#[from] reqwest::Error),
+    Reqwest(#[from] reqwest::Error),
 
     #[error("JWT verification error: {0}")]
     JwtVerification(String),
@@ -63,21 +63,21 @@ impl IntoResponse for ServerError {
                 (sc, msg)
             }
             ServerError::Permission(missing) => {
-                error!("Missing permission: {:?}", missing);
+                warn!("Missing permission: {:?}", missing);
                 (
                     StatusCode::FORBIDDEN,
                     format!("Missing permission: {:?}", missing),
                 )
             }
             ServerError::NotFound(e) => {
-                error!("Entity not found: {}", e);
+                warn!("Entity not found: {}", e);
                 (StatusCode::NOT_FOUND, e)
             }
             ServerError::AccessDenied => {
-                error!("Access denied for requesting entity");
+                warn!("Access denied for requesting entity");
                 (StatusCode::FORBIDDEN, String::from("Access denied"))
             }
-            ServerError::Request(e) => {
+            ServerError::Reqwest(e) => {
                 error!("Failed to send request: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -85,7 +85,7 @@ impl IntoResponse for ServerError {
                 )
             }
             ServerError::JwtVerification(e) => {
-                error!("Failed to verify JWT: {}", e);
+                warn!("Failed to verify JWT: {}", e);
                 (StatusCode::UNAUTHORIZED, String::new())
             }
             ServerError::Json(e) => {

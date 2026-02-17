@@ -5,7 +5,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{
         error::ServerError,
         game_base::Gender,
@@ -272,26 +272,6 @@ pub async fn patch_base_user_by_id(
     let result: BaseUser = builder.build_query_as().fetch_one(pool).await?;
 
     Ok(result)
-}
-
-pub async fn delete_base_user_by_id(pool: &Pool<Postgres>, id: &Uuid) -> Result<(), ServerError> {
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM "base_user" WHERE id = $1;
-        "#,
-        id
-    )
-    .execute(pool)
-    .await?;
-
-    if result.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!(
-            "User with id {} does not exist",
-            id
-        )));
-    }
-
-    Ok(())
 }
 
 pub async fn list_base_users(

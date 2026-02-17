@@ -1,8 +1,9 @@
 pub mod auth_mw;
 pub mod game;
 pub mod game_tip;
+pub mod gs_client;
 pub mod health;
 pub mod system_log;
 pub mod user;
+pub mod validation;
 pub mod webhook_mw;
-pub mod gs_client;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use moka::future::Cache;
-use tracing::{debug, error};
+use tracing::{debug, warn};
 
 use crate::models::{
     error::ServerError,
@@ -44,7 +44,7 @@ impl<T: Clone + Send + Sync + 'static> GustCache<T> {
         {
             Ok(entry) => Ok(entry),
             Err(e) => {
-                error!("Cache failed to get entry: {}", e);
+                warn!("Cache failed to get entry: {}", e);
                 Err(ServerError::Internal(e.to_string()))
             }
         }
@@ -68,7 +68,7 @@ impl<T: Clone + Send + Sync + 'static> GustCache<T> {
         }) {
             Ok(_) => Ok(()),
             Err(e) => {
-                error!("Failed to invalidate category: {}", e);
+                warn!("Failed to invalidate category: {}", e);
                 Err(ServerError::Internal(
                     "Cache error: Predicate error".to_string(),
                 ))
@@ -94,7 +94,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_or_cache_hit() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
-        let key = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
+        let key = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
 
         let call_count = Arc::new(AtomicUsize::new(0));
         let call_count_clone = call_count.clone();
@@ -129,8 +129,8 @@ mod tests {
     async fn test_get_or_different_keys_are_separate() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
-        let key_quiz = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
-        let key_duel = make_key(GameType::Duel, Some(GameCategory::Vors), 0);
+        let key_quiz = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
+        let key_duel = make_key(GameType::Duel, Some(GameCategory::Mixed), 0);
 
         let _ = cache
             .get_or(key_quiz.clone(), async { Ok("quiz_value".to_string()) })
@@ -162,31 +162,31 @@ mod tests {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
         // Same game type, different categories
-        let key_quiz_vors = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
+        let key_quiz_mixed = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
         let key_quiz_boys = make_key(GameType::Quiz, Some(GameCategory::Boys), 0);
         // Different game type, same category (should NOT be invalidated)
-        let key_duel_vors = make_key(GameType::Duel, Some(GameCategory::Vors), 0);
+        let key_duel_mixed = make_key(GameType::Duel, Some(GameCategory::Mixed), 0);
 
         // Populate cache
         let _ = cache
-            .get_or(key_quiz_vors.clone(), async { Ok("quiz_vors".to_string()) })
+            .get_or(key_quiz_mixed.clone(), async { Ok("quiz_mixed".to_string()) })
             .await;
         let _ = cache
             .get_or(key_quiz_boys.clone(), async { Ok("quiz_boys".to_string()) })
             .await;
         let _ = cache
-            .get_or(key_duel_vors.clone(), async { Ok("duel_vors".to_string()) })
+            .get_or(key_duel_mixed.clone(), async { Ok("duel_mixed".to_string()) })
             .await;
 
-        // Invalidate only Quiz + Vors
+        // Invalidate only Quiz + Mixed
         cache
-            .invalidate(GameType::Quiz, &GameCategory::Vors)
+            .invalidate(GameType::Quiz, &GameCategory::Mixed)
             .await
             .unwrap();
 
-        // Quiz Vors should be invalidated
-        let quiz_vors_result = cache
-            .get_or(key_quiz_vors, async { Ok("new_quiz_vors".to_string()) })
+        // Quiz Mixed should be invalidated
+        let quiz_mixed_result = cache
+            .get_or(key_quiz_mixed, async { Ok("new_quiz_mixed".to_string()) })
             .await
             .unwrap();
 
@@ -196,22 +196,22 @@ mod tests {
             .await
             .unwrap();
 
-        // Duel Vors should still be cached (different game type, same category)
-        let duel_vors_result = cache
-            .get_or(key_duel_vors, async { Ok("new_duel_vors".to_string()) })
+        // Duel Mixed should still be cached (different game type, same category)
+        let duel_mixed_result = cache
+            .get_or(key_duel_mixed, async { Ok("new_duel_mixed".to_string()) })
             .await
             .unwrap();
 
-        assert_eq!(quiz_vors_result, "new_quiz_vors"); // Was invalidated
+        assert_eq!(quiz_mixed_result, "new_quiz_mixed"); // Was invalidated
         assert_eq!(quiz_boys_result, "quiz_boys"); // Still cached
-        assert_eq!(duel_vors_result, "duel_vors"); // Still cached (different game type)
+        assert_eq!(duel_mixed_result, "duel_mixed"); // Still cached (different game type)
     }
 
     #[tokio::test]
     async fn test_invalidate_also_removes_none_category() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
-        let key_with_category = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
+        let key_with_category = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
         let key_no_category = make_key(GameType::Quiz, None, 0);
 
         // Populate cache
@@ -224,9 +224,9 @@ mod tests {
             .get_or(key_no_category.clone(), async { Ok("no_cat".to_string()) })
             .await;
 
-        // Invalidate Vors - should also invalidate None category
+        // Invalidate Mixed - should also invalidate None category
         cache
-            .invalidate(GameType::Quiz, &GameCategory::Vors)
+            .invalidate(GameType::Quiz, &GameCategory::Mixed)
             .await
             .unwrap();
 
@@ -249,8 +249,8 @@ mod tests {
     async fn test_invalidate_does_not_affect_other_game_types() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
-        let key_quiz = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
-        let key_duel = make_key(GameType::Duel, Some(GameCategory::Vors), 0);
+        let key_quiz = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
+        let key_duel = make_key(GameType::Duel, Some(GameCategory::Mixed), 0);
 
         // Populate cache
         let _ = cache
@@ -262,7 +262,7 @@ mod tests {
 
         // Invalidate Quiz Vors
         cache
-            .invalidate(GameType::Quiz, &GameCategory::Vors)
+            .invalidate(GameType::Quiz, &GameCategory::Mixed)
             .await
             .unwrap();
 
@@ -286,7 +286,7 @@ mod tests {
     async fn test_ttl_expiration() {
         let cache: GustCache<String> = GustCache::from_ttl(1); // 1 second TTL
 
-        let key = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
+        let key = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
 
         // Populate cache
         let _ = cache
@@ -318,8 +318,8 @@ mod tests {
     async fn test_different_pages_are_separate_entries() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
-        let key_page_0 = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
-        let key_page_1 = make_key(GameType::Quiz, Some(GameCategory::Vors), 1);
+        let key_page_0 = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
+        let key_page_1 = make_key(GameType::Quiz, Some(GameCategory::Mixed), 1);
 
         let _ = cache
             .get_or(key_page_0.clone(), async { Ok("page_0".to_string()) })
@@ -346,9 +346,9 @@ mod tests {
     async fn test_invalidate_removes_all_pages_for_category() {
         let cache: GustCache<String> = GustCache::from_ttl(60);
 
-        let key_page_0 = make_key(GameType::Quiz, Some(GameCategory::Vors), 0);
-        let key_page_1 = make_key(GameType::Quiz, Some(GameCategory::Vors), 1);
-        let key_page_2 = make_key(GameType::Quiz, Some(GameCategory::Vors), 2);
+        let key_page_0 = make_key(GameType::Quiz, Some(GameCategory::Mixed), 0);
+        let key_page_1 = make_key(GameType::Quiz, Some(GameCategory::Mixed), 1);
+        let key_page_2 = make_key(GameType::Quiz, Some(GameCategory::Mixed), 2);
 
         // Populate all pages
         let _ = cache
@@ -363,7 +363,7 @@ mod tests {
 
         // Invalidate category
         cache
-            .invalidate(GameType::Quiz, &GameCategory::Vors)
+            .invalidate(GameType::Quiz, &GameCategory::Mixed)
             .await
             .unwrap();
 

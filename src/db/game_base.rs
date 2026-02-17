@@ -6,7 +6,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{
         error::ServerError,
         game_base::{

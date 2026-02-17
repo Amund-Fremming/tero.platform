@@ -6,6 +6,8 @@ use axum::{
     response::IntoResponse,
     routing::{delete, get, patch, post},
 };
+
+use crate::api::validation::ValidatedJson;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
@@ -16,7 +18,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     db::{
         self,
         game_base::{
@@ -109,15 +111,14 @@ async fn delete_game(
             .invalidate(deleted_game.game_type, &deleted_game.category)
             .await
         {
-            tracing::error!(
+            warn!(
                 "Failed to invalidate cache after deleting game {}: {}",
-                game_id,
-                e
+                game_id, e
             );
             state_pointer
                 .syslog()
                 .action(LogAction::Delete)
-                .ceverity(LogCeverity::Critical)
+                .ceverity(LogCeverity::Warning)
                 .function("delete_game")
                 .subject(subject_id)
                 .description("Failed to invalidate game cache after deletion")
@@ -139,7 +140,7 @@ async fn join_interactive_game(
     Path(key_word): Path<String>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
-        tracing::error!("Integration {} attempted to access user-only endpoint", id);
+        warn!("Integration {} attempted to access user-only endpoint", id);
         return Err(ServerError::AccessDenied);
     }
 
@@ -180,7 +181,7 @@ async fn create_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
-    Json(request): Json<CreateGameRequest>,
+    ValidatedJson(request): ValidatedJson<CreateGameRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     let user_id = match subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
@@ -226,15 +227,14 @@ async fn create_interactive_game(
 
     tokio::spawn(async move {
         if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            tracing::error!(
+            warn!(
                 "Failed to invalidate cache after creating game {}: {}",
-                game_base.id,
-                e
+                game_base.id, e
             );
             state_pointer
                 .syslog()
                 .action(LogAction::Create)
-                .ceverity(LogCeverity::Critical)
+                .ceverity(LogCeverity::Warning)
                 .function("create_interactive_game")
                 .subject(subject_id)
                 .description("Failed to invalidate game cache after creation")
@@ -456,15 +456,14 @@ async fn create_random_interactive_game(
 
     tokio::spawn(async move {
         if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            tracing::error!(
+            warn!(
                 "Failed to invalidate cache after creating random game {}: {}",
-                game_base.id,
-                e
+                game_base.id, e
             );
             state_pointer
                 .syslog()
                 .action(LogAction::Create)
-                .ceverity(LogCeverity::Critical)
+                .ceverity(LogCeverity::Warning)
                 .function("create_random_interactive_game")
                 .subject(subject_id)
                 .description("Failed to invalidate game cache after random creation")
@@ -499,7 +498,7 @@ async fn get_games(
     Json(request): Json<GamePageQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(_) = subject_id {
-        tracing::error!("Integration attempted to access game listing endpoint");
+        warn!("Integration attempted to access game listing endpoint");
         return Err(ServerError::AccessDenied);
     }
 
@@ -524,7 +523,7 @@ pub async fn persist_standalone_game(
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
-        tracing::error!("Integration {} attempted to store a static game", id);
+        warn!("Integration {} attempted to store a static game", id);
         return Err(ServerError::AccessDenied);
     }
 
@@ -582,7 +581,7 @@ async fn persist_interactive_game(
     Json(request): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
-        tracing::error!("Non-integration user attempted to persist game session");
+        warn!("Non-integration user attempted to persist game session");
         return Err(ServerError::AccessDenied);
     };
 
@@ -651,12 +650,12 @@ async fn free_game_key(
     info!("Subject: {:?}", subject_id);
 
     let SubjectId::Integration(_) = subject_id else {
-        tracing::error!("Non-integration user attempted to free game keys");
+        warn!("Non-integration user attempted to free game keys");
         return Err(ServerError::AccessDenied);
     };
 
     if let Some(missing) = claims.missing_permission([Permission::WriteGame]) {
-        error!("Missing permission: {:?}", missing);
+        warn!("Missing permission: {:?}", missing);
         return Err(ServerError::Permission(missing));
     }
 
@@ -682,7 +681,7 @@ async fn user_save_game(
     Path(game_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(user_id) = subject_id else {
-        error!("Unregistered user or integration tried saving a game");
+        warn!("Unregistered user or integration tried saving a game");
         return Err(ServerError::AccessDenied);
     };
 
@@ -696,7 +695,7 @@ async fn user_usaved_game(
     Path(game_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(user_id) = subject_id else {
-        error!("Unregistered user or integration tried saving a game");
+        warn!("Unregistered user or integration tried unsaving a game");
         return Err(ServerError::AccessDenied);
     };
 
@@ -710,7 +709,7 @@ async fn get_saved_games(
     Query(query): Query<SavedGamesPageQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(user_id) = subject_id else {
-        error!("Unregistered user or integration tried saving a game");
+        warn!("Unregistered user or integration tried fetching saved games");
         return Err(ServerError::AccessDenied);
     };
 

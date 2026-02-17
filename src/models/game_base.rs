@@ -4,6 +4,7 @@ use std::hash::Hash;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::models::{
     imposter_game::ImposterSession, quiz_game::QuizSession, spin_game::SpinSession,
@@ -58,19 +59,19 @@ impl GameBase {
 #[derive(Debug, Serialize, Deserialize, Hash, Clone, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "game_category", rename_all = "lowercase")]
 pub enum GameCategory {
-    Vors,
-    Ladies,
+    Girls,
     Boys,
-    All,
+    Mixed,
+    InnerCircle,
 }
 
 impl fmt::Display for GameCategory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameCategory::Ladies => write!(f, "ladies"),
+            GameCategory::Girls => write!(f, "girls"),
             GameCategory::Boys => write!(f, "boys"),
-            GameCategory::Vors => write!(f, "vors"),
-            GameCategory::All => write!(f, "all"),
+            GameCategory::Mixed => write!(f, "mixed"),
+            GameCategory::InnerCircle => write!(f, "innercircle"),
         }
     }
 }
@@ -148,8 +149,9 @@ pub struct InteractiveEnvelope {
     pub payload: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateGameRequest {
+    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
     pub name: String,
     pub category: GameCategory,
 }
@@ -158,7 +160,7 @@ impl CreateGameRequest {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            category: GameCategory::All,
+            category: GameCategory::Mixed,
         }
     }
 }

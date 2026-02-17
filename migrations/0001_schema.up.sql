@@ -36,10 +36,10 @@ CREATE TYPE "subject_type" AS ENUM (
 );
 
 CREATE TYPE game_category AS ENUM (
-    'vors',
-    'ladies',
+    'girls',
     'boys',
-    'all'
+    'mixed',
+    'innercircle'
 );
 
 CREATE TYPE gender AS ENUM (
@@ -83,12 +83,6 @@ CREATE TABLE "suffix_word" (
     "word" VARCHAR(5) PRIMARY KEY
 );
 
-CREATE TABLE "integration" (
-    "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    "subject" VARCHAR(40) NOT NULL,
-    "name" integration_name NOT NULL
-);
-
 CREATE TABLE "pseudo_user" (
     "id" UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
     "last_active" TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -112,7 +106,7 @@ CREATE TABLE "game_base" (
     "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     "name" VARCHAR(100) NOT NULL,
     "game_type" game_type NOT NULL,
-    "category" game_category NOT NULL DEFAULT 'all',
+    "category" game_category NOT NULL DEFAULT 'mixed',
     "iterations" INTEGER NOT NULL DEFAULT 0,
     "times_played" INTEGER NOT NULL DEFAULT 0,
     "last_played" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -149,8 +143,6 @@ CREATE INDEX "idx_saved_game_delete_keys" ON "saved_game" ("id", "user_id");
 CREATE INDEX "idx_system_log_ceverity" ON "system_log" ("ceverity", "created_at" DESC);
 
 CREATE INDEX "idx_game_tip_created_at" ON "game_tip" ("created_at" DESC);
-
-CREATE INDEX "idx_integration_subject" ON "integration" ("subject");
 
 CREATE INDEX "idx_game_base_id" ON "game_base" ("id");
 CREATE INDEX "idx_game_base_game_type" ON "game_base" ("game_type", "times_played" DESC);

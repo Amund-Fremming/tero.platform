@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 use tracing::info;
 
 use crate::{
-    config::config::CONFIG,
+    config::app_config::CONFIG,
     models::{error::ServerError, integration::IntegrationName, user::SubjectId},
     service::util::extract_header,
 };

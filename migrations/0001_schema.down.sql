@@ -16,8 +16,6 @@ DROP INDEX IF EXISTS "idx_system_log_ceverity";
 
 DROP INDEX IF EXISTS "idx_saved_game_delete_keys";
 
-DROP INDEX IF EXISTS "idx_integration_subject";
-
 DROP INDEX IF EXISTS "idx_game_base_id";
 DROP INDEX IF EXISTS "idx_game_base_game_type";
 DROP INDEX IF EXISTS "idx_game_base_type_and_category";
@@ -34,7 +32,6 @@ DROP TABLE IF EXISTS "quiz_game";
 DROP TABLE IF EXISTS "spin_game";
 DROP TABLE IF EXISTS "imposter_game";
 DROP TABLE IF EXISTS "system_log";
-DROP TABLE IF EXISTS "integration";
 DROP TABLE IF EXISTS "prefix_word";
 DROP TABLE IF EXISTS "suffix_word";
 DROP TABLE IF EXISTS "base_user";
