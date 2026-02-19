@@ -332,12 +332,12 @@ async fn initiate_interactive_game(
     let value = match game_type {
         GameType::Roulette => {
             let game = get_spin_game_by_id(pool, game_id).await?;
-            let session = SpinSession::from_duel(user_id, game);
+            let session = SpinSession::from_roulette(user_id, game);
             session.to_json()?
         }
         GameType::Duel => {
             let game = get_spin_game_by_id(pool, game_id).await?;
-            let session = SpinSession::from_roulette(user_id, game);
+            let session = SpinSession::from_duel(user_id, game);
             session.to_json()?
         }
         _ => {
@@ -719,8 +719,6 @@ async fn get_saved_games(
     Extension(subject_id): Extension<SubjectId>,
     Query(query): Query<GamePagedRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
-    dbg!(&query);
-    dbg!(&query);
     let SubjectId::BaseUser(user_id) = subject_id else {
         warn!("Unregistered user or integration tried fetching saved games");
         return Err(ServerError::AccessDenied);
