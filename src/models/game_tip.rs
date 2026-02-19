@@ -14,11 +14,11 @@ pub struct GameTip {
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateGameTipRequest {
-    #[validate(length(min = 1, max = 100))]
+    #[validate(length(min = 3, max = 30))]
     pub header: String,
     #[validate(length(min = 1, max = 20))]
     pub mobile_phone: String,
-    #[validate(length(min = 1, max = 300))]
+    #[validate(length(min = 8, max = 300))]
     pub description: String,
 }
 

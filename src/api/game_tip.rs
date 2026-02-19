@@ -6,11 +6,11 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use axum_valid::Valid;
 use reqwest::StatusCode;
 use tracing::warn;
 
 use crate::{
+    api::validation::ValidatedJson,
     db,
     models::{
         app_state::AppState,
@@ -35,7 +35,7 @@ pub fn protected_game_tip_routes(state: Arc<AppState>) -> Router {
 
 async fn create_game_tip(
     State(state): State<Arc<AppState>>,
-    Valid(Json(request)): Valid<Json<CreateGameTipRequest>>,
+    ValidatedJson(request): ValidatedJson<CreateGameTipRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     let tip_id = db::game_tip::create_game_tip(state.get_pool(), &request).await?;
 

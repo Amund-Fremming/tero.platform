@@ -20,6 +20,7 @@ pub enum GSClientError {
 pub struct InteractiveGameResponse {
     pub key: String,
     pub hub_address: String,
+    pub is_draft: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +28,7 @@ pub struct JoinGameResponse {
     pub game_key: String,
     pub hub_address: String,
     pub game_type: GameType,
+    pub is_draft: bool,
 }
 
 #[derive(Debug, Clone)]

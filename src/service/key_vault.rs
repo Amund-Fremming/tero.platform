@@ -30,6 +30,7 @@ pub enum KeyVaultError {
 pub struct VaultValue {
     timestamp: u64,
     game_type: GameType,
+    is_draft: bool,
 }
 
 pub struct KeyVault {
@@ -58,9 +59,9 @@ impl KeyVault {
         Ok(vault)
     }
 
-    pub fn key_active(&self, key: &(String, String)) -> Option<GameType> {
+    pub fn key_active(&self, key: &(String, String)) -> Option<(GameType, bool)> {
         match self.active_keys.get(key) {
-            Some(value) => Some(value.game_type),
+            Some(value) => Some((value.game_type, value.is_draft)),
             None => None,
         }
     }
@@ -81,6 +82,7 @@ impl KeyVault {
         &self,
         _pool: &Pool<Postgres>,
         game_type: GameType,
+        is_draft: bool,
     ) -> Result<String, KeyVaultError> {
         for _ in 0..100 {
             let Ok((idx1, idx2)) = self.random_idx() else {
@@ -100,6 +102,7 @@ impl KeyVault {
             let value = VaultValue {
                 timestamp,
                 game_type,
+                is_draft,
             };
 
             self.active_keys.insert(key.clone(), value);
@@ -118,6 +121,7 @@ impl KeyVault {
                 let value = VaultValue {
                     timestamp,
                     game_type,
+                    is_draft,
                 };
 
                 self.active_keys.insert(key.clone(), value);

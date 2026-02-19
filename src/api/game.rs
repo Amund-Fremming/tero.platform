@@ -156,7 +156,7 @@ async fn join_interactive_game(
         }
     };
 
-    let Some(game_type) = state.get_vault().key_active(&tuple) else {
+    let Some((game_type, is_draft)) = state.get_vault().key_active(&tuple) else {
         return Err(ServerError::Api(
             StatusCode::NOT_FOUND,
             "Game with game key does not exist".into(),
@@ -172,6 +172,7 @@ async fn join_interactive_game(
         game_key: key_word,
         hub_address,
         game_type,
+        is_draft,
     };
 
     Ok((StatusCode::OK, Json(response)))
@@ -246,7 +247,7 @@ async fn create_interactive_game(
         }
     });
 
-    let key = state.get_vault().create_key(pool, game_type)?;
+    let key = state.get_vault().create_key(pool, game_type, true)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -258,7 +259,11 @@ async fn create_interactive_game(
         .await?;
 
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
-    let response = InteractiveGameResponse { key, hub_address };
+    let response = InteractiveGameResponse {
+        key,
+        hub_address,
+        is_draft: true,
+    };
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -343,7 +348,7 @@ async fn initiate_interactive_game(
         }
     };
 
-    let key = vault.create_key(pool, game_type)?;
+    let key = vault.create_key(pool, game_type, false)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -354,7 +359,11 @@ async fn initiate_interactive_game(
         .await?;
 
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
-    let response = InteractiveGameResponse { key, hub_address };
+    let response = InteractiveGameResponse {
+        key,
+        hub_address,
+        is_draft: false,
+    };
 
     tokio::task::spawn(async move {
         if let Err(e) = sync_and_update_base(state.get_pool(), game_id, None).await {
@@ -475,7 +484,7 @@ async fn create_random_interactive_game(
         }
     });
 
-    let key = state.get_vault().create_key(pool, game_type)?;
+    let key = state.get_vault().create_key(pool, game_type, false)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -487,7 +496,11 @@ async fn create_random_interactive_game(
         .await?;
 
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
-    let response = InteractiveGameResponse { key, hub_address };
+    let response = InteractiveGameResponse {
+        key,
+        hub_address,
+        is_draft: false,
+    };
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -706,6 +719,8 @@ async fn get_saved_games(
     Extension(subject_id): Extension<SubjectId>,
     Query(query): Query<GamePagedRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
+    dbg!(&query);
+    dbg!(&query);
     let SubjectId::BaseUser(user_id) = subject_id else {
         warn!("Unregistered user or integration tried fetching saved games");
         return Err(ServerError::AccessDenied);

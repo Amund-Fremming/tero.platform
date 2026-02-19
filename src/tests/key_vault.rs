@@ -25,11 +25,13 @@ mod tests {
         let vault = state.get_vault();
 
         for num in 0..10_000 {
-            let word = vault.create_key(state.get_pool(), GameType::Quiz).unwrap();
+            let word = vault
+                .create_key(state.get_pool(), GameType::Quiz, false)
+                .unwrap();
             println!("{} - {}", num + 1, word)
         }
 
-        let result = vault.create_key(state.get_pool(), GameType::Quiz);
+        let result = vault.create_key(state.get_pool(), GameType::Quiz, false);
         assert!(result.is_err());
 
         let error = result.err().unwrap();
@@ -50,9 +52,9 @@ mod tests {
 
             let handle = tokio::spawn(async move {
                 let vault = state_clone.get_vault();
-                match vault.create_key(state_clone.get_pool(), GameType::Quiz) {
+                match vault.create_key(state_clone.get_pool(), GameType::Quiz, false) {
                     Ok(key) => {
-                        println!("Task {} opprettet nøkkel: {}", i, key);
+                        //println!("Task {} opprettet nøkkel: {}", i, key);
                         Ok(key)
                     }
                     Err(e) => {
@@ -93,7 +95,7 @@ mod tests {
             );
         }
 
-        assert!(successful_keys.is_empty(), "Ingen nøkler ble opprettet");
+        assert!(!successful_keys.is_empty(), "Ingen nøkler ble opprettet");
         assert_eq!(
             successful_keys.len(),
             unique_keys.len(),

@@ -220,6 +220,7 @@ pub async fn get_saved_games_page(
     let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
     let offset = request.page_num.unwrap_or(0) * page_size;
+    let game_type = request.game_type.unwrap_or(GameType::Quiz);
 
     let query = format!(
         r#"
@@ -230,11 +231,12 @@ pub async fn get_saved_games_page(
             base.category,
             base.iterations,
             base.times_played,
-            base.last_played
+            base.last_played,
+            base.synced
         FROM "game_base" base
         JOIN "saved_game" saved
         ON base.id = saved.base_id
-        WHERE saved.user_id = $1
+        WHERE synced = true AND saved.user_id = $1 AND base.game_type = $2
         LIMIT {} OFFSET {}
         "#,
         limit, offset
@@ -242,6 +244,7 @@ pub async fn get_saved_games_page(
 
     let mut games = sqlx::query_as::<_, GameBase>(&query)
         .bind(user_id)
+        .bind(game_type)
         .fetch_all(pool)
         .await?;
 
