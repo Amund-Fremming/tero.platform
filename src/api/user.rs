@@ -8,7 +8,7 @@ use axum::{
     routing::{get, patch, post, put},
 };
 
-use crate::api::validation::ValidatedJson;
+use crate::{api::validation::ValidatedJson, models::user::ListUsersQuery};
 use serde_json::json;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, error, info, warn};
@@ -28,10 +28,7 @@ use crate::{
         auth::Claims,
         error::ServerError,
         system_log::{LogAction, LogCeverity},
-        user::{
-            Auth0User, EnsureUserQuery, ListUsersQuery, PatchUserRequest, Permission, SubjectId,
-            UserRole,
-        },
+        user::{Auth0User, EnsureUserQuery, PatchUserRequest, Permission, SubjectId, UserRole},
     },
     service::{popup_manager::ClientPopup, system_log_builder::SystemLogBuilder},
 };

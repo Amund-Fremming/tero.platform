@@ -52,7 +52,7 @@ fn default_port() -> String {
     "3000".into()
 }
 
-fn default_page_size() -> u8 {
+fn default_page_size() -> u16 {
     20
 }
 
@@ -72,7 +72,7 @@ pub struct ServerConfig {
     pub port: String,
     pub gs_domain: String,
     #[serde(default = "default_page_size")]
-    pub page_size: u8,
+    pub page_size: u16,
     #[serde(default = "default_active_game_retention")]
     pub active_game_retention: u8,
 }

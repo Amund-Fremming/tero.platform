@@ -6,9 +6,9 @@ use crate::{
     config::app_config::CONFIG,
     models::{
         error::ServerError,
+        game_base::PagedResponse,
         game_tip::{CreateGameTipRequest, GameTip},
     },
-    service::popup_manager::PagedResponse,
 };
 
 pub async fn create_game_tip(
@@ -43,7 +43,7 @@ pub async fn get_game_tips_page(
     let offset = (page_size * page_num) as i64;
     let limit = (page_size + 1) as i64;
 
-    let tips = sqlx::query_as!(
+    let mut tips = sqlx::query_as!(
         GameTip,
         r#"
         SELECT id, header, mobile_phone, description, created_at
@@ -58,12 +58,16 @@ pub async fn get_game_tips_page(
     .await?;
 
     let has_next = tips.len() >= page_size as usize;
-    let mut items = tips;
     if has_next {
-        items.truncate(page_size as usize);
+        tips.pop();
     }
 
-    let page = PagedResponse::new(items, has_next);
+    let page = PagedResponse {
+        page_num,
+        items: tips,
+        has_prev: page_num > 0,
+        has_next,
+    };
 
     Ok(page)
 }

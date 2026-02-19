@@ -8,14 +8,14 @@ use crate::{
     config::app_config::CONFIG,
     models::{
         error::ServerError,
-        game_base::Gender,
+        game_base::{Gender, PagedResponse},
         system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
             RecentUserStats,
         },
     },
-    service::{popup_manager::PagedResponse, system_log_builder::SystemLogBuilder},
+    service::system_log_builder::SystemLogBuilder,
 };
 
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {
@@ -276,12 +276,12 @@ pub async fn patch_base_user_by_id(
 
 pub async fn list_base_users(
     pool: &Pool<Postgres>,
-    query: ListUsersQuery,
+    request: ListUsersQuery,
 ) -> Result<PagedResponse<BaseUser>, sqlx::Error> {
-    let offset = CONFIG.server.page_size * query.page_num;
+    let offset = CONFIG.server.page_size * request.page_num;
     let limit = CONFIG.server.page_size + 1;
 
-    let items = sqlx::query_as!(
+    let mut users = sqlx::query_as!(
         BaseUser,
         r#"
         SELECT id, username, auth0_id, birth_date, gender as "gender: _", email, email_verified, updated_at, family_name, given_name, created_at
@@ -295,8 +295,17 @@ pub async fn list_base_users(
     .fetch_all(pool)
     .await?;
 
-    let has_next = items.len() > CONFIG.server.page_size as usize;
-    let response = PagedResponse::new(items, has_next);
+    let has_next = users.len() > CONFIG.server.page_size as usize;
+    if has_next {
+        users.pop();
+    }
+
+    let response = PagedResponse {
+        page_num: request.page_num,
+        items: users,
+        has_prev: request.page_num > 0,
+        has_next,
+    };
 
     Ok(response)
 }

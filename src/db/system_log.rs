@@ -5,19 +5,20 @@ use crate::{
     config::app_config::CONFIG,
     models::{
         error::ServerError,
+        game_base::PagedResponse,
         system_log::{
             LogAction, LogCategoryCount, LogCeverity, SubjectType, SyslogPageQuery, SystemLog,
         },
     },
-    service::popup_manager::PagedResponse,
 };
 
 pub async fn get_system_log_page(
     pool: &Pool<Postgres>,
     request: SyslogPageQuery,
 ) -> Result<PagedResponse<SystemLog>, sqlx::Error> {
+    let page_num = request.page_num.unwrap_or(0);
     let page_size = CONFIG.server.page_size as u16;
-    let offset = (page_size * request.page_num.unwrap_or(0)) as i64;
+    let offset = (page_size * page_num) as i64;
     let limit = (page_size + 1) as i64;
 
     let mut query = r#"
@@ -62,17 +63,21 @@ pub async fn get_system_log_page(
         limit, offset
     ));
 
-    let logs = sqlx::query_as::<_, SystemLog>(&query)
+    let mut logs = sqlx::query_as::<_, SystemLog>(&query)
         .fetch_all(pool)
         .await?;
 
     let has_next = logs.len() >= page_size as usize;
-    let mut items = logs;
     if has_next {
-        items.pop();
+        logs.pop();
     }
 
-    let page = PagedResponse::new(items, has_next);
+    let page = PagedResponse {
+        has_prev: page_num > 0,
+        items: logs,
+        page_num,
+        has_next,
+    };
 
     Ok(page)
 }

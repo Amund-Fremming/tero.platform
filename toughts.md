@@ -8,5 +8,6 @@
 - Move auth0 id to pseudo user? and rename it to something more generic, Could be nice as nullable to know if the pseudo has a registered user
 - Microservice for auth0 to receive events and store in log if it cannot reach main backend. When backend is good an buffer is not empty, batch create
 - Move away from auth0, its expencive
+- admin page to get tips
 
 - Error handling for client, game full/game does not exist ..

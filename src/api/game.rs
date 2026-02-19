@@ -7,7 +7,7 @@ use axum::{
     routing::{delete, get, patch, post},
 };
 
-use crate::api::validation::ValidatedJson;
+use crate::{api::validation::ValidatedJson, models::game_base::GamePagedRequest};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
@@ -34,8 +34,8 @@ use crate::{
         auth::Claims,
         error::ServerError,
         game_base::{
-            CreateGameRequest, GameBase, GameCacheKey, GameConverter, GamePageQuery, GameType,
-            InitiateGameRequest, InteractiveEnvelope, ResponseWrapper, SavedGamesPageQuery,
+            CreateGameRequest, GameBase, GameCacheKey, GameConverter, GameType,
+            InitiateGameRequest, InteractiveEnvelope, ResponseWrapper,
         },
         imposter_game::ImposterSession,
         quiz_game::QuizSession,
@@ -52,7 +52,7 @@ use crate::{
 ///     questions but standalone when playing.
 pub fn game_routes(state: Arc<AppState>) -> Router {
     let generic_routes = Router::new()
-        .route("/page", post(get_games))
+        .route("/page", get(get_games))
         .route("/{game_id}", delete(delete_game))
         .route("/free-key/{game_key}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
@@ -495,7 +495,7 @@ async fn create_random_interactive_game(
 async fn get_games(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Json(request): Json<GamePageQuery>,
+    Query(request): Query<GamePagedRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(_) = subject_id {
         warn!("Integration attempted to access game listing endpoint");
@@ -503,7 +503,7 @@ async fn get_games(
     }
 
     let cache = state.get_cache();
-    let cache_key = GameCacheKey::from_query(&request);
+    let cache_key = GameCacheKey::from_request(&request);
     let pool = state.get_pool().clone();
     let request_clone = request.clone();
 
@@ -704,7 +704,7 @@ async fn user_usaved_game(
 async fn get_saved_games(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
-    Query(query): Query<SavedGamesPageQuery>,
+    Query(query): Query<GamePagedRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::BaseUser(user_id) = subject_id else {
         warn!("Unregistered user or integration tried fetching saved games");

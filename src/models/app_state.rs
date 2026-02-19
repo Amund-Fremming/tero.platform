@@ -13,13 +13,11 @@ use crate::{
     models::{
         auth::Jwks,
         error::ServerError,
-        game_base::GameBase,
+        game_base::{GameBase, PagedResponse},
         system_log::{LogAction, LogCeverity},
     },
     service::{
-        cache::GustCache,
-        key_vault::KeyVault,
-        popup_manager::{PagedResponse, PopupManager},
+        cache::GustCache, key_vault::KeyVault, popup_manager::PopupManager,
         system_log_builder::SystemLogBuilder,
     },
 };

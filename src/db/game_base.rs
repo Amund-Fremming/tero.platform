@@ -10,10 +10,9 @@ use crate::{
     models::{
         error::ServerError,
         game_base::{
-            DeleteGameResult, GameBase, GamePageQuery, GameType, RandomGame, SavedGamesPageQuery,
+            DeleteGameResult, GameBase, GamePagedRequest, GameType, PagedResponse, RandomGame,
         },
     },
-    service::popup_manager::PagedResponse,
 };
 
 pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
@@ -59,11 +58,11 @@ pub async fn delete_non_active_games(pool: &Pool<Postgres>) -> Result<(), sqlx::
 
 pub async fn get_game_page(
     pool: &Pool<Postgres>,
-    request: &GamePageQuery,
+    request: &GamePagedRequest,
 ) -> Result<PagedResponse<GameBase>, sqlx::Error> {
     let page_size = CONFIG.server.page_size as u16;
     let limit = page_size + 1;
-    let offset = page_size * request.page_num;
+    let offset = page_size * request.page_num.unwrap_or(0);
 
     let category = match &request.category {
         Some(category) => format!("AND category = '{}'", category),
@@ -86,7 +85,7 @@ pub async fn get_game_page(
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
-        request.game_type.as_str(),
+        request.game_type.unwrap_or(GameType::Quiz).as_str(),
         category,
         limit,
         offset
@@ -100,7 +99,12 @@ pub async fn get_game_page(
     if has_next {
         games.pop();
     }
-    let page = PagedResponse::new(games, has_next);
+    let page = PagedResponse {
+        page_num: request.page_num.unwrap_or(0),
+        items: games,
+        has_next,
+        has_prev: request.page_num.unwrap_or(0) > 0,
+    };
 
     Ok(page)
 }
@@ -211,11 +215,11 @@ pub async fn delete_saved_game(
 pub async fn get_saved_games_page(
     pool: &Pool<Postgres>,
     user_id: Uuid,
-    query: SavedGamesPageQuery,
+    request: GamePagedRequest,
 ) -> Result<PagedResponse<GameBase>, ServerError> {
     let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
-    let offset = query.page_num.unwrap_or(0) * page_size;
+    let offset = request.page_num.unwrap_or(0) * page_size;
 
     let query = format!(
         r#"
@@ -245,7 +249,12 @@ pub async fn get_saved_games_page(
     if has_next {
         games.pop();
     }
-    let page = PagedResponse::new(games, has_next);
+    let page = PagedResponse {
+        page_num: request.page_num.unwrap_or(0) as u16,
+        items: games,
+        has_next,
+        has_prev: request.page_num.unwrap_or(0) > 0,
+    };
 
     Ok(page)
 }

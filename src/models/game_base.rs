@@ -10,6 +10,21 @@ use crate::models::{
     imposter_game::ImposterSession, quiz_game::QuizSession, spin_game::SpinSession,
 };
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GamePagedRequest {
+    pub page_num: Option<u16>,
+    pub game_type: Option<GameType>,
+    pub category: Option<GameCategory>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PagedResponse<T> {
+    pub page_num: u16,
+    pub items: Vec<T>,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
 pub trait GameConverter {
     fn to_json(&self) -> Result<serde_json::Value, serde_json::Error>;
 }
@@ -123,25 +138,13 @@ pub struct GameCacheKey {
 }
 
 impl GameCacheKey {
-    pub fn from_query(query: &GamePageQuery) -> Self {
+    pub fn from_request(query: &GamePagedRequest) -> Self {
         Self {
-            page_num: query.page_num,
-            game_type: query.game_type,
+            page_num: query.page_num.unwrap_or(0),
+            game_type: query.game_type.unwrap_or(GameType::Quiz),
             category: query.category.clone(),
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Hash, Clone)]
-pub struct GamePageQuery {
-    pub page_num: u16,
-    pub game_type: GameType,
-    pub category: Option<GameCategory>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SavedGamesPageQuery {
-    pub page_num: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

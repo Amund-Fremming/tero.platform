@@ -7,7 +7,7 @@ use crate::models::{game_base::Gender, integration::IntegrationName};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListUsersQuery {
-    pub page_num: u8,
+    pub page_num: u16,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

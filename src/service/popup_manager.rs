@@ -4,20 +4,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PagedResponse<T> {
-    page_num: u16,
-    items: Vec<T>,
-    has_next: bool,
-    has_prev: bool,
-}
-
-impl<T> PagedResponse<T> {
-    pub fn new(items: Vec<T>, has_next: bool) -> Self {
-        Self { items, has_next }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientPopup {
     pub heading: String,
     pub paragraph: String,
