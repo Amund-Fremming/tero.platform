@@ -2,7 +2,7 @@
 address = "127.0.0.1"
 port = 3000
 gs_domain = "http://localhost:9000"
-page_size = 3
+page_size = 5
 
 [auth0]
 domain = "https://dev-tero.eu.auth0.com/"

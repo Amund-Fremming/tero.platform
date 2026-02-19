@@ -23,7 +23,7 @@ use crate::{
         self,
         game_base::{
             create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
-            sync_and_increment_times_played, take_random_game,
+            sync_and_update_base, take_random_game,
         },
         imposter_game::create_imposter_game,
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
@@ -283,9 +283,9 @@ async fn initiate_standalone_game(
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, None).await {
             tracing::error!(
-                "Failed to sync and increment times played for {} {}: {}",
+                "Failed to sync and update for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -357,9 +357,9 @@ async fn initiate_interactive_game(
     let response = InteractiveGameResponse { key, hub_address };
 
     tokio::task::spawn(async move {
-        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, None).await {
             tracing::error!(
-                "Failed to sync and increment times played for {} {}: {}",
+                "Failed to sync and update for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -527,12 +527,12 @@ pub async fn persist_standalone_game(
         return Err(ServerError::AccessDenied);
     }
 
-    let game_id = match game_type {
+    let (game_id, iterations) = match game_type {
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            let game_id = session.game_id;
+            let (game_id, iterations) = (session.game_id, session.rounds.len());
             create_quiz_game(state.get_pool(), &session.into()).await?;
-            game_id
+            (game_id, iterations)
         }
         _ => {
             return Err(ServerError::Api(
@@ -543,9 +543,9 @@ pub async fn persist_standalone_game(
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, Some(iterations)).await {
             tracing::error!(
-                "Failed to sync and increment times played for {} {}: {}",
+                "Failed to sync and update for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -556,9 +556,7 @@ pub async fn persist_standalone_game(
                 .ceverity(LogCeverity::Warning)
                 .function("persist_standalone_game")
                 .subject(subject_id)
-                .description(
-                    "Failed to sync and increment game play counter after persisting standalone game",
-                )
+                .description("Failed to sync update game base after persisting standalone game")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,
@@ -591,31 +589,31 @@ async fn persist_interactive_game(
 
     let pool = state.get_pool();
 
-    let game_id = match game_type {
+    let (game_id, iterations) = match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(request.payload)?;
-            let game_id = session.game_id;
+            let (game_id, iterations) = (session.game_id, session.rounds.len());
             create_spin_game(pool, &session.into()).await?;
-            game_id
+            (game_id, iterations)
         }
         GameType::Quiz => {
             let session: QuizSession = serde_json::from_value(request.payload)?;
-            let game_id = session.game_id;
+            let (game_id, iterations) = (session.game_id, session.rounds.len());
             create_quiz_game(pool, &session.into()).await?;
-            game_id
+            (game_id, iterations)
         }
         GameType::Imposter => {
             let session: ImposterSession = serde_json::from_value(request.payload)?;
-            let game_id = session.game_id;
+            let (game_id, iterations) = (session.game_id, session.rounds.len());
             create_imposter_game(pool, &session.into()).await?;
-            game_id
+            (game_id, iterations)
         }
     };
 
     tokio::task::spawn(async move {
-        if let Err(e) = sync_and_increment_times_played(state.get_pool(), game_id).await {
+        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, Some(iterations)).await {
             error!(
-                "Failed to sync and increment times played for {} {}: {}",
+                "Failed to sync and update for {} {}: {}",
                 game_type.as_str(),
                 game_id,
                 e
@@ -626,7 +624,7 @@ async fn persist_interactive_game(
                 .ceverity(LogCeverity::Warning)
                 .function("persist_interactive_game")
                 .subject(subject_id.clone())
-                .description("Sync and increment times plated failed")
+                .description("Sync and update base game failed")
                 .metadata(json!({
                     "error": e.to_string(),
                     "game_id": game_id,

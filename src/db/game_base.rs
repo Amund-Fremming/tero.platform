@@ -105,21 +105,28 @@ pub async fn get_game_page(
     Ok(page)
 }
 
-pub async fn sync_and_increment_times_played(
+pub async fn sync_and_update_base(
     pool: &Pool<Postgres>,
     game_id: Uuid,
+    iterations: Option<usize>,
 ) -> Result<(), ServerError> {
-    let row = sqlx::query!(
+    let iterations_condition = match iterations {
+        Some(iterations) => format!(", iterations = {}", iterations),
+        None => String::new(),
+    };
+
+    let query = format!(
         r#"
         UPDATE "game_base"
-        SET times_played = times_played + 1, last_played = $1, synced = true
-        WHERE id = $2
+        SET times_played = times_played + 1, last_played = '{}', synced = true{}
+        WHERE id = '{}'
         "#,
         Utc::now(),
+        iterations_condition,
         game_id
-    )
-    .execute(pool)
-    .await?;
+    );
+
+    let row = sqlx::query(&query).execute(pool).await?;
 
     if row.rows_affected() == 0 {
         return Err(ServerError::NotFound(format!(
