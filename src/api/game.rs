@@ -144,7 +144,7 @@ async fn join_interactive_game(
         return Err(ServerError::AccessDenied);
     }
 
-    let words: Vec<&str> = key_word.split(" ").collect();
+    let words: Vec<&str> = key_word.trim().split(" ").collect();
     let tuple = match (words.first(), words.get(1)) {
         (Some(p), Some(s)) => (p.to_string(), s.to_string()),
         _ => {
