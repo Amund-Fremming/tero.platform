@@ -8,7 +8,11 @@ use axum::{
     routing::{get, patch, post, put},
 };
 
-use crate::{api::validation::ValidatedJson, models::user::ListUsersQuery};
+use crate::{
+    api::validation::ValidatedJson,
+    config::app_config::CONFIG,
+    models::user::{ListUsersQuery, ResetPasswordRequest},
+};
 use serde_json::json;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, error, info, warn};
@@ -44,9 +48,10 @@ pub fn protected_auth_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(list_all_users))
         .route("/me", get(get_base_user_from_subject))
-        .route("/{user_id}", patch(patch_user))
         .route("/activity-stats", get(get_user_activity_stats))
         .route("/popups", put(update_client_popup))
+        .route("/reset-password/{user_id}", post(reset_password))
+        .route("/{user_id}", patch(patch_user))
         .with_state(state)
 }
 
@@ -298,4 +303,64 @@ pub async fn get_client_popup(
 ) -> Result<impl IntoResponse, ServerError> {
     let popup = state.get_popup_manager().read().await;
     Ok((StatusCode::OK, Json(popup)))
+}
+
+pub async fn reset_password(
+    State(state): State<Arc<AppState>>,
+    Extension(subject): Extension<SubjectId>,
+    Path(user_id): Path<Uuid>,
+    ValidatedJson(request): ValidatedJson<ResetPasswordRequest>,
+) -> Result<impl IntoResponse, ServerError> {
+    match subject {
+        SubjectId::BaseUser(uid) => {
+            if uid != user_id {
+                warn!("User {} is doing side channel attack", uid);
+                return Err(ServerError::AccessDenied);
+            }
+        }
+        SubjectId::Integration(intname) => {
+            warn!(
+                "Integration {} tried resetting users {} password",
+                intname, user_id,
+            );
+            return Err(ServerError::AccessDenied);
+        }
+        SubjectId::PseudoUser(_pid) => {
+            warn!("Psuedo users cannot reset passwords");
+            return Err(ServerError::AccessDenied);
+        }
+    }
+
+    let payload = json!({
+        "client_id": CONFIG.auth0.client_id,
+        "email": request.email,
+        "connection": "Username-Password-Authentication",
+    });
+
+    info!("Reset password requested for: {}", request.email);
+    let response = state
+        .get_client()
+        .post(format!(
+            "{}dbconnections/change_password",
+            CONFIG.auth0.domain
+        ))
+        .header("content-type", "application/json")
+        .json(&payload)
+        .send()
+        .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let msg = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "No body".to_string());
+        error!("Request to auth0 failed: {}", msg);
+        return Err(ServerError::Api(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Request to auth0 failed".to_string(),
+        ));
+    }
+
+    Ok(StatusCode::OK)
 }

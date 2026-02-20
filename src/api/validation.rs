@@ -48,10 +48,7 @@ where
             Err(e) => {
                 let error_msg = format_validation_errors(&e);
                 info!("Validation error: {}", error_msg);
-                Err(ServerError::Api(
-                    StatusCode::BAD_REQUEST,
-                    error_msg,
-                ))
+                Err(ServerError::Api(StatusCode::BAD_REQUEST, error_msg))
             }
         }
     }
@@ -60,17 +57,18 @@ where
 /// Format validation errors into a user-friendly message
 fn format_validation_errors(errors: &validator::ValidationErrors) -> String {
     let mut messages = Vec::new();
-    
+
     for (field, field_errors) in errors.field_errors() {
         for error in field_errors {
-            let msg = error.message
+            let msg = error
+                .message
                 .as_ref()
                 .map(|m| m.to_string())
                 .unwrap_or_else(|| format!("{} validation failed", field));
             messages.push(msg);
         }
     }
-    
+
     if messages.is_empty() {
         "Validation failed".to_string()
     } else {
@@ -80,49 +78,59 @@ fn format_validation_errors(errors: &validator::ValidationErrors) -> String {
 
 // Validation functions for reuse across models
 
-/// Validate username: 3-30 chars, alphanumeric, underscores, hyphens
+/// Validate username: 3-30 chars, alphanumeric, underscores, hyphens, periods (but not at start)
 pub fn validate_username(username: &str) -> Result<(), ValidationError> {
     let len = username.len();
-    
+
     if len < 3 {
         return Err(ValidationError::new("username_too_short")
             .with_message("Username must be at least 3 characters".into()));
     }
-    
+
     if len > 30 {
         return Err(ValidationError::new("username_too_long")
             .with_message("Username must be at most 30 characters".into()));
     }
-    
-    if !username.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err(ValidationError::new("username_invalid_chars")
-            .with_message("Username can only contain letters, numbers, underscores and hyphens".into()));
+
+    if username.starts_with('.') {
+        return Err(ValidationError::new("username_invalid_start")
+            .with_message("Username cannot start with a period".into()));
     }
-    
+
+    if !username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
+    {
+        return Err(ValidationError::new("username_invalid_chars").with_message(
+            "Username can only contain letters, numbers, underscores, hyphens and periods".into(),
+        ));
+    }
+
     Ok(())
 }
 
 /// Validate person name (given_name, family_name): 1-50 chars, letters, spaces, and common name chars
 pub fn validate_person_name(name: &str) -> Result<(), ValidationError> {
     let len = name.trim().len();
-    
+
     if len == 0 {
-        return Err(ValidationError::new("name_empty")
-            .with_message("Name cannot be empty".into()));
+        return Err(ValidationError::new("name_empty").with_message("Name cannot be empty".into()));
     }
-    
+
     if len > 50 {
         return Err(ValidationError::new("name_too_long")
             .with_message("Name must be at most 50 characters".into()));
     }
-    
-    if !name.chars().all(|c| {
-        c.is_alphabetic() || c.is_whitespace() || c == '\'' || c == '-' || c == '.'
-    }) {
-        return Err(ValidationError::new("name_invalid_chars")
-            .with_message("Name can only contain letters, spaces, hyphens, apostrophes and periods".into()));
+
+    if !name
+        .chars()
+        .all(|c| c.is_alphabetic() || c.is_whitespace() || c == '\'' || c == '-' || c == '.')
+    {
+        return Err(ValidationError::new("name_invalid_chars").with_message(
+            "Name can only contain letters, spaces, hyphens, apostrophes and periods".into(),
+        ));
     }
-    
+
     Ok(())
 }
 
@@ -130,22 +138,22 @@ pub fn validate_person_name(name: &str) -> Result<(), ValidationError> {
 pub fn validate_game_name(name: &str) -> Result<(), ValidationError> {
     let trimmed = name.trim();
     let len = trimmed.len();
-    
+
     if len < 3 {
         return Err(ValidationError::new("game_name_too_short")
             .with_message("Game name must be at least 3 characters".into()));
     }
-    
+
     if len > 100 {
         return Err(ValidationError::new("game_name_too_long")
             .with_message("Game name must be at most 100 characters".into()));
     }
-    
+
     // Check if it's not just whitespace/special chars
     if !trimmed.chars().any(|c| c.is_alphanumeric()) {
         return Err(ValidationError::new("game_name_invalid")
             .with_message("Game name must contain at least one letter or number".into()));
     }
-    
+
     Ok(())
 }

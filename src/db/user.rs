@@ -328,7 +328,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         r#"
         SELECT
             COALESCE((
-                SELECT AVG(cnt)::float8 
+                SELECT FLOOR(AVG(cnt))::float8
                 FROM (
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 
@@ -337,7 +337,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
                 ) t
             ), 0) AS "avg_month_users!",
             COALESCE((
-                SELECT AVG(cnt)::float8 
+                SELECT FLOOR(AVG(cnt))::float8
                 FROM (
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 
@@ -346,7 +346,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
                 ) t
             ), 0) AS "avg_week_users!",
             COALESCE((
-                SELECT AVG(cnt)::float8 
+                SELECT FLOOR(AVG(cnt))::float8
                 FROM (
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 

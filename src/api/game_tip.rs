@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
 };
 use reqwest::StatusCode;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     api::validation::ValidatedJson,
@@ -61,6 +61,7 @@ async fn get_game_tips_admin(
         return Err(ServerError::Permission(missing));
     }
 
+    debug!("Fetching game tips");
     let page = db::game_tip::get_game_tips_page(state.get_pool(), query.page_num).await?;
     Ok((StatusCode::OK, Json(page)))
 }

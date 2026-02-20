@@ -5,6 +5,12 @@ use validator::Validate;
 
 use crate::models::{game_base::Gender, integration::IntegrationName};
 
+#[derive(Deserialize, Debug, Validate)]
+pub struct ResetPasswordRequest {
+    #[validate(email)]
+    pub email: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListUsersQuery {
     pub page_num: u16,

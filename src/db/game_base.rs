@@ -62,7 +62,9 @@ pub async fn get_game_page(
 ) -> Result<PagedResponse<GameBase>, sqlx::Error> {
     let page_size = CONFIG.server.page_size as u16;
     let limit = page_size + 1;
-    let offset = page_size * request.page_num.unwrap_or(0);
+    let page_num = request.page_num.unwrap_or(0);
+    let game_type_str = request.game_type.unwrap_or(GameType::Quiz).as_str();
+    let offset = page_size * page_num;
 
     let category = match &request.category {
         Some(category) => format!("AND category = '{}'", category),
@@ -85,10 +87,7 @@ pub async fn get_game_page(
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
-        request.game_type.unwrap_or(GameType::Quiz).as_str(),
-        category,
-        limit,
-        offset
+        game_type_str, category, limit, offset
     );
 
     let mut games = sqlx::query_as::<_, GameBase>(&query)
@@ -100,10 +99,10 @@ pub async fn get_game_page(
         games.pop();
     }
     let page = PagedResponse {
-        page_num: request.page_num.unwrap_or(0),
+        page_num: page_num,
         items: games,
         has_next,
-        has_prev: request.page_num.unwrap_or(0) > 0,
+        has_prev: page_num > 0,
     };
 
     Ok(page)
@@ -219,7 +218,8 @@ pub async fn get_saved_games_page(
 ) -> Result<PagedResponse<GameBase>, ServerError> {
     let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
-    let offset = request.page_num.unwrap_or(0) * page_size;
+    let page_num = request.page_num.unwrap_or(0);
+    let offset = page_num * page_size;
     let game_type = request.game_type.unwrap_or(GameType::Quiz);
 
     let query = format!(
@@ -253,10 +253,10 @@ pub async fn get_saved_games_page(
         games.pop();
     }
     let page = PagedResponse {
-        page_num: request.page_num.unwrap_or(0) as u16,
+        page_num: page_num,
         items: games,
         has_next,
-        has_prev: request.page_num.unwrap_or(0) > 0,
+        has_prev: page_num > 0,
     };
 
     Ok(page)
