@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -27,21 +27,12 @@ impl From<ImposterSession> for ImposterGame {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ImposterGameState {
-    Created,
-    Initialized,
-    Started,
-    Finished,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ImposterSession {
     pub game_id: Uuid,
     pub host_id: Uuid,
-    pub state: ImposterGameState,
     pub current_iteration: i32,
     pub rounds: Vec<String>,
-    pub players: HashMap<Uuid, i32>,
+    pub players: HashSet<String>,
 }
 
 impl ImposterSession {
@@ -49,10 +40,9 @@ impl ImposterSession {
         Self {
             game_id,
             host_id,
-            state: ImposterGameState::Created,
             current_iteration: 0,
             rounds: vec![],
-            players: HashMap::from([(host_id, 0)]),
+            players: HashSet::new(),
         }
     }
 
@@ -60,10 +50,9 @@ impl ImposterSession {
         Self {
             game_id: game.game_id,
             host_id: user_id,
-            state: ImposterGameState::Initialized,
             current_iteration: 0,
             rounds: game.rounds,
-            players: HashMap::from([(user_id, 0)]),
+            players: HashSet::new(),
         }
     }
 }
