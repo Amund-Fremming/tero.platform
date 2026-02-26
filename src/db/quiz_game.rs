@@ -5,9 +5,9 @@ use crate::models::{error::ServerError, quiz_game::QuizGame};
 
 pub async fn get_quiz_game_by_id(
     pool: &Pool<Postgres>,
-    game_id: &Uuid,
-) -> Result<QuizGame, ServerError> {
-    let game = sqlx::query_as!(
+    game_id: Uuid,
+) -> Result<QuizGame, sqlx::Error> {
+    sqlx::query_as!(
         QuizGame,
         r#"
         SELECT id, rounds 
@@ -16,14 +16,8 @@ pub async fn get_quiz_game_by_id(
         "#,
         game_id
     )
-    .fetch_optional(pool)
-    .await?
-    .ok_or(ServerError::NotFound(format!(
-        "Quiz with id {} does not exist",
-        game_id
-    )))?;
-
-    Ok(game)
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn create_quiz_game(pool: &Pool<Postgres>, game: &QuizGame) -> Result<(), ServerError> {

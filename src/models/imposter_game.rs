@@ -46,6 +46,16 @@ impl ImposterSession {
         }
     }
 
+    pub fn from_game(user_id: Uuid, game: ImposterGame) -> Self {
+        Self {
+            game_id: game.id,
+            host_id: user_id,
+            current_iteration: 0,
+            rounds: game.rounds,
+            players: HashSet::new(),
+        }
+    }
+
     pub fn from_random(user_id: Uuid, game: RandomGame) -> Self {
         Self {
             game_id: game.game_id,

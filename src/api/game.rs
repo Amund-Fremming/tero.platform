@@ -7,7 +7,10 @@ use axum::{
     routing::{delete, get, patch, post},
 };
 
-use crate::{api::validation::ValidatedJson, models::game_base::GamePagedRequest};
+use crate::{
+    api::validation::ValidatedJson, db::imposter_game::get_imposter_game_by_id,
+    models::game_base::GamePagedRequest,
+};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
@@ -273,11 +276,26 @@ async fn initiate_standalone_game(
     Extension(subject_id): Extension<SubjectId>,
     Path((game_type, game_id)): Path<(GameType, Uuid)>,
 ) -> Result<impl IntoResponse, ServerError> {
+    let user_id = match subject_id {
+        SubjectId::BaseUser(id) | SubjectId::PseudoUser(id) => id,
+        _ => {
+            warn!("Non user tried to initiate stanalone game");
+            return Err(ServerError::AccessDenied);
+        }
+    };
+
     let wrapper = match game_type {
         GameType::Quiz => {
-            let game = get_quiz_game_by_id(state.get_pool(), &game_id).await?;
+            let game = get_quiz_game_by_id(state.get_pool(), game_id).await?;
             let session = QuizSession::from_game(game);
             ResponseWrapper::Quiz(session)
+        }
+        GameType::Imposter => {
+            println!("en");
+            let game = get_imposter_game_by_id(state.get_pool(), game_id).await?;
+            println!("to");
+            let session = ImposterSession::from_game(user_id, game);
+            ResponseWrapper::Imposter(session)
         }
         _ => {
             return Err(ServerError::Api(
