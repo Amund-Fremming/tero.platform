@@ -16,7 +16,6 @@ use crate::{
 };
 
 pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
-    // newly created games are not played
     let times_played = 0;
     let row = sqlx::query!(
         r#"

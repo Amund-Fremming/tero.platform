@@ -166,14 +166,9 @@ async fn join_interactive_game(
         ));
     };
 
-    let hub_address = format!(
-        "{}/hubs/{}",
-        CONFIG.server.gs_domain,
-        game_type.clone().hub_name()
-    );
     let response = JoinGameResponse {
         game_key: key_word,
-        hub_address,
+        hub_name: game_type.as_str().to_string(),
         game_type,
         is_draft,
     };
@@ -261,10 +256,9 @@ async fn create_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
-        hub_address,
+        hub_name: game_type.hub_name().to_string(),
         is_draft: true,
     };
 
@@ -291,9 +285,7 @@ async fn initiate_standalone_game(
             ResponseWrapper::Quiz(session)
         }
         GameType::Imposter => {
-            println!("en");
             let game = get_imposter_game_by_id(state.get_pool(), game_id).await?;
-            println!("to");
             let session = ImposterSession::from_game(user_id, game);
             ResponseWrapper::Imposter(session)
         }
@@ -376,10 +368,9 @@ async fn initiate_interactive_game(
         .initiate_game_session(client, &game_type, &payload)
         .await?;
 
-    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
-        hub_address,
+        hub_name: game_type.hub_name().to_string(),
         is_draft: false,
     };
 
@@ -516,7 +507,7 @@ async fn create_random_interactive_game(
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
-        hub_address,
+        hub_name: hub_address,
         is_draft: false,
     };
 
