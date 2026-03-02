@@ -18,6 +18,7 @@ allow = [
     "Unicode-3.0",
     "BSL-1.0",
     "Unlicense",
+    "OpenSSL",
 ]
 confidence-threshold = 0.8
 
@@ -31,8 +32,16 @@ skip = [
     { name = "hashbrown" },
     { name = "rand" },
     { name = "rand_core" },
+    { name = "rand_chacha" },
     { name = "windows-sys" },
     { name = "windows-targets" },
+    { name = "windows_aarch64_gnullvm" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_i686_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_x86_64_gnullvm" },
+    { name = "windows_x86_64_msvc" },
 ]
 
 [sources]
