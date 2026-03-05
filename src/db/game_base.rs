@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use sqlx::{Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -9,13 +9,39 @@ use crate::{
     config::app_config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{
-            DeleteGameBaseResponse, GameBase, GamePagedRequest, GameType, PagedResponse,
-            PatchGameBaseRequest, RandomGame,
-        },
+        game_base::{GameBase, GamePagedRequest, GameType, PagedResponse, RandomGame},
     },
 };
-pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
+
+pub async fn increment_times_played(
+    pool: &Pool<Postgres>,
+    game_id: Uuid,
+) -> Result<(), ServerError> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "game_base"
+        SET times_played = times_played + 1
+        WHERE id = $1
+        "#,
+        game_id
+    )
+    .execute(pool)
+    .await?;
+
+    if row.rows_affected() == 0 {
+        return Err(ServerError::NotFound(format!(
+            "Game with id {} does not exist",
+            game_id
+        )));
+    }
+
+    Ok(())
+}
+
+pub async fn create_game_base<'e, E>(executor: E, game: &GameBase) -> Result<(), sqlx::Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
     let times_played = 0;
     let row = sqlx::query!(
         r#"
@@ -30,7 +56,7 @@ pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<
         times_played,
         game.last_played
     )
-    .execute(pool)
+    .execute(executor)
     .await?;
 
     if row.rows_affected() == 0 {
@@ -105,86 +131,6 @@ pub async fn get_game_page(
     };
 
     Ok(page)
-}
-
-pub async fn sync_and_update_base(
-    pool: &Pool<Postgres>,
-    game_id: Uuid,
-    iterations: Option<usize>,
-) -> Result<(), ServerError> {
-    let iterations_condition = match iterations {
-        Some(iterations) => format!(", iterations = {}", iterations),
-        None => String::new(),
-    };
-
-    let query = format!(
-        r#"
-        UPDATE "game_base"
-        SET times_played = times_played + 1, last_played = '{}', synced = true{}
-        WHERE id = '{}'
-        "#,
-        Utc::now(),
-        iterations_condition,
-        game_id
-    );
-
-    let row = sqlx::query(&query).execute(pool).await?;
-
-    if row.rows_affected() == 0 {
-        return Err(ServerError::NotFound(format!(
-            "Game with id {} does not exist",
-            game_id
-        )));
-    }
-
-    Ok(())
-}
-
-pub async fn delete_game(
-    pool: &Pool<Postgres>,
-    id: Uuid,
-) -> Result<DeleteGameBaseResponse, sqlx::Error> {
-    let row = sqlx::query_as::<_, DeleteGameBaseResponse>(
-        r#"
-        DELETE FROM "game_base"
-        WHERE id = $1
-        RETURNING game_type, category
-        "#,
-    )
-    .bind(id)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(DeleteGameBaseResponse {
-        game_type: row.game_type,
-        category: row.category,
-    })
-}
-
-pub async fn patch_game_base_db(
-    pool: &Pool<Postgres>,
-    id: Uuid,
-    request: &PatchGameBaseRequest,
-) -> Result<(), ServerError> {
-    let row = sqlx::query!(
-        r#"
-        UPDATE "game_base" SET
-            name = COALESCE($1, name),
-            category = COALESCE($2, category)
-        WHERE id = $3
-        "#,
-        request.name,
-        request.category as _,
-        id
-    )
-    .execute(pool)
-    .await?;
-
-    if row.rows_affected() == 0 {
-        warn!("Patch on game base had no changes");
-    }
-
-    Ok(())
 }
 
 pub async fn save_game(

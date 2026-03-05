@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -18,7 +18,10 @@ pub async fn get_spin_game_by_id(pool: &Pool<Postgres>, id: Uuid) -> Result<Spin
     .await
 }
 
-pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<(), sqlx::Error> {
+pub async fn create_spin_game<'e, E>(executor: E, game: &SpinGame) -> Result<(), sqlx::Error>
+where
+    E: Executor<'e, Database = Postgres>,
+{
     let row = sqlx::query!(
         r#"
         INSERT INTO "spin_game" (id, rounds)
@@ -27,7 +30,7 @@ pub async fn create_spin_game(pool: &Pool<Postgres>, game: &SpinGame) -> Result<
         game.id,
         &game.rounds
     )
-    .execute(pool)
+    .execute(executor)
     .await?;
 
     if row.rows_affected() == 0 {

@@ -8,26 +8,23 @@ use axum::{
 };
 
 use crate::{
-    api::validation::ValidatedJson,
-    db::{game_base::patch_game_base_db, imposter_game::get_imposter_game_by_id},
+    db::{game_base::increment_times_played, imposter_game::get_imposter_game_by_id},
     models::game_base::GamePagedRequest,
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
-use serde_json::json;
 use uuid::Uuid;
 
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
     config::app_config::CONFIG,
     db::{
-        self,
         game_base::{
-            create_game_base as create_game_base_db, delete_saved_game, get_game_page,
-            get_saved_games_page, save_game, sync_and_update_base, take_random_game,
+            create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
+            take_random_game,
         },
         imposter_game::create_imposter_game,
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
@@ -39,15 +36,48 @@ use crate::{
         error::ServerError,
         game_base::{
             GameBase, GameCacheKey, GameConverter, GameType, InitiateGameRequest,
-            InteractiveEnvelope, PatchGameBaseRequest, ResponseWrapper,
+            InteractiveEnvelope, ResponseWrapper,
         },
         imposter_game::ImposterSession,
         quiz_game::QuizSession,
         spin_game::SpinSession,
-        system_log::{LogAction, LogCeverity},
         user::{Permission, SubjectId},
     },
 };
+
+// TODO - is this needed?
+async fn _get_random_name(client: &reqwest::Client) -> String {
+    let mut rng = ChaCha8Rng::from_os_rng();
+    let len = rng.random_range(4..=8);
+    let result = client
+        .get(format!(
+            "https://random-word-api.herokuapp.com/word?length={}",
+            len
+        ))
+        .send()
+        .await;
+
+    let Ok(response) = result else {
+        return String::from("Generic");
+    };
+
+    let status = response.status();
+
+    if !status.is_success() {
+        return String::from("Generic");
+    }
+
+    let Ok(names) = response.json::<Vec<String>>().await else {
+        return String::from("Generic");
+    };
+
+    dbg!(&names);
+
+    names
+        .first()
+        .cloned()
+        .unwrap_or_else(|| String::from("Generic"))
+}
 
 /// NOTE TO SELF
 ///     Some games can be created as interactive games for people to interact
@@ -57,12 +87,10 @@ use crate::{
 pub fn game_routes(state: Arc<AppState>) -> Router {
     let general_routes = Router::new()
         .route("/page", get(get_games))
-        .route("/{game_id}", delete(delete_game).patch(patch_game_base))
         .route("/free-key/{game_key}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
         .route("/unsave/{game_id}", delete(user_usaved_game))
         .route("/saved", get(get_saved_games))
-        .route("/{game_type}/create", post(create_game_base))
         .with_state(state.clone());
 
     let static_routes = Router::new()
@@ -81,80 +109,16 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         )
         .route(
             "/{game_type}/initiate-random",
-            post(create_random_interactive_game),
+            post(create_random_interactive_session),
         )
         .route("/join/{game_id}", post(join_interactive_game))
+        .route("/{game_type}/create", post(create_game_session))
         .with_state(state.clone());
 
     Router::new()
         .nest("/general", general_routes)
         .nest("/static", static_routes)
         .nest("/session", session_routes)
-}
-
-async fn delete_game(
-    State(state): State<Arc<AppState>>,
-    Extension(subject_id): Extension<SubjectId>,
-    Extension(claims): Extension<Claims>,
-    Path(game_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ServerError> {
-    if let SubjectId::Integration(_) | SubjectId::PseudoUser(_) = subject_id {
-        return Err(ServerError::AccessDenied);
-    }
-
-    if let Some(missing) = claims.missing_permission([Permission::WriteAdmin]) {
-        return Err(ServerError::Permission(missing));
-    }
-
-    let deleted_game = db::game_base::delete_game(state.get_pool(), game_id).await?;
-    let cache_pointer = state.get_cache().clone();
-    let state_pointer = state.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = cache_pointer
-            .invalidate(deleted_game.game_type, &deleted_game.category)
-            .await
-        {
-            warn!(
-                "Failed to invalidate cache after deleting game {}: {}",
-                game_id, e
-            );
-            state_pointer
-                .syslog()
-                .action(LogAction::Delete)
-                .ceverity(LogCeverity::Warning)
-                .function("delete_game")
-                .subject(subject_id)
-                .description("Failed to invalidate game cache after deletion")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_type": deleted_game.game_type,
-                    "game_id": game_id,
-                }))
-                .log_async();
-        };
-    });
-
-    Ok(StatusCode::OK)
-}
-
-async fn patch_game_base(
-    State(state): State<Arc<AppState>>,
-    Extension(subject_id): Extension<SubjectId>,
-    Extension(_claims): Extension<Claims>,
-    Path(game_id): Path<Uuid>,
-    ValidatedJson(request): ValidatedJson<PatchGameBaseRequest>,
-) -> Result<impl IntoResponse, ServerError> {
-    if let SubjectId::Integration(_) = subject_id {
-        return Err(ServerError::AccessDenied);
-    }
-
-    if request.name.is_none() && request.category.is_none() {
-        return Ok(StatusCode::OK);
-    }
-
-    patch_game_base_db(state.get_pool(), game_id, &request).await?;
-    Ok(StatusCode::OK)
 }
 
 async fn join_interactive_game(
@@ -197,7 +161,7 @@ async fn join_interactive_game(
     Ok((StatusCode::OK, Json(response)))
 }
 
-async fn create_game_base(
+async fn create_game_session(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
@@ -207,84 +171,33 @@ async fn create_game_base(
         _ => return Err(ServerError::AccessDenied),
     };
 
-    // TODO - use some api or create your own funciton to create random names under 8 chars and over 4.
-    let game_name = "Default".to_string();
-
-    let (value, game_base) = match game_type {
-        GameType::Roulette => {
-            let game_base = GameBase::new(game_name, GameType::Roulette);
-            let session_json = SpinSession::new_roulette(user_id, game_base.id).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Duel => {
-            let game_base = GameBase::new(game_name, GameType::Duel);
-            let session_json = SpinSession::new_duel(user_id, game_base.id).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Quiz => {
-            let game_base = GameBase::new(game_name, GameType::Quiz);
-            let session_json = QuizSession::new(game_base.id).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Imposter => {
-            let game_base = GameBase::new(game_name, GameType::Imposter);
-            let session_json = ImposterSession::new(user_id, game_base.id).to_json()?;
-            (session_json, game_base)
-        }
+    let game_id = Uuid::new_v4();
+    let value = match game_type {
+        GameType::Roulette => SpinSession::new_roulette(user_id, game_id).to_json()?,
+        GameType::Duel => SpinSession::new_duel(user_id, game_id).to_json()?,
+        GameType::Quiz => QuizSession::new(game_id).to_json()?,
+        GameType::Imposter => ImposterSession::new(user_id, game_id).to_json()?,
     };
-
-    let client = state.get_client();
-    let gs_client = state.get_gs_client();
-    let pool = state.get_pool();
-
-    // Store game base
-    create_game_base_db(pool, &game_base).await?;
-    info!("Persisted interactive game base");
-
-    // Invalidate cache for this game type and category
-    let cache = state.get_cache().clone();
-    let category = game_base.category.clone();
-    let game_type_clone = game_type;
-    let state_pointer = state.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            warn!(
-                "Failed to invalidate cache after creating game {}: {}",
-                game_base.id, e
-            );
-            state_pointer
-                .syslog()
-                .action(LogAction::Create)
-                .ceverity(LogCeverity::Warning)
-                .function("create_interactive_game")
-                .subject(subject_id)
-                .description("Failed to invalidate game cache after creation")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_type": game_type_clone,
-                }))
-                .log_async();
-        }
-    });
 
     let key = state
         .get_vault()
-        .create_key(pool, game_type, true, game_base.id)?;
+        .create_key(state.get_pool(), game_type, true, game_id)?;
+
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
     };
     debug!("Created key: {}", key);
 
-    gs_client
-        .initiate_game_session(client, &game_type, &payload)
+    state
+        .get_gs_client()
+        .initiate_game_session(&game_type, &payload)
         .await?;
 
     let response = InteractiveGameResponse {
         key,
+        game_id,
         hub_name: game_type.hub_name().to_string(),
-        game_id: game_base.id,
         is_draft: true,
     };
 
@@ -299,7 +212,7 @@ async fn initiate_standalone_game(
     let user_id = match subject_id {
         SubjectId::BaseUser(id) | SubjectId::PseudoUser(id) => id,
         _ => {
-            warn!("Non user tried to initiate stanalone game");
+            warn!("Integration tried accessing user endpoint");
             return Err(ServerError::AccessDenied);
         }
     };
@@ -323,29 +236,7 @@ async fn initiate_standalone_game(
         }
     };
 
-    tokio::task::spawn(async move {
-        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, None).await {
-            tracing::error!(
-                "Failed to sync and update for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
-            state
-                .syslog()
-                .action(LogAction::Update)
-                .ceverity(LogCeverity::Warning)
-                .function("initiate_standalone_game")
-                .subject(subject_id)
-                .description("Failed to sync and increment game play counter for standalone game")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_id": game_id,
-                    "game_type": game_type,
-                }))
-                .log_async();
-        }
-    });
+    increment_times_played(state.get_pool(), game_id).await?;
 
     Ok((StatusCode::OK, Json(wrapper)))
 }
@@ -360,7 +251,6 @@ async fn initiate_interactive_game(
         _ => return Err(ServerError::AccessDenied),
     };
 
-    let client = state.get_client();
     let gs_client = state.get_gs_client();
     let vault = state.get_vault();
     let pool = state.get_pool();
@@ -392,8 +282,10 @@ async fn initiate_interactive_game(
         value,
     };
 
+    // TODO tokio join here
+    increment_times_played(state.get_pool(), game_id).await?;
     gs_client
-        .initiate_game_session(client, &game_type, &payload)
+        .initiate_game_session(&game_type, &payload)
         .await?;
 
     let response = InteractiveGameResponse {
@@ -403,34 +295,10 @@ async fn initiate_interactive_game(
         is_draft: false,
     };
 
-    tokio::task::spawn(async move {
-        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, None).await {
-            tracing::error!(
-                "Failed to sync and update for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
-            state
-                .syslog()
-                .action(LogAction::Update)
-                .ceverity(LogCeverity::Warning)
-                .function("initiate_interactive_game")
-                .subject(subject_id)
-                .description("Failed to sync and increment game play counter for interactive game")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_id": game_id,
-                    "game_type": game_type,
-                }))
-                .log_async();
-        }
-    });
-
     Ok((StatusCode::OK, Json(response)))
 }
 
-async fn create_random_interactive_game(
+async fn create_random_interactive_session(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
@@ -440,90 +308,24 @@ async fn create_random_interactive_game(
         _ => return Err(ServerError::AccessDenied),
     };
 
-    let mut rng = ChaCha8Rng::from_os_rng();
-    let len = rng.random_range(4..=8);
-    let response = state
-        .get_client()
-        .get(format!(
-            "https://random-word-api.herokuapp.com/word?length={}",
-            len
-        ))
-        .send()
-        .await?;
-    let status = response.status();
+    let game_id = Uuid::new_v4();
+    let random_game = take_random_game(state.get_pool(), &game_type).await?;
+    // TODO - delete random game when its taken, do in same call
 
-    let game_name = if !status.is_success() {
-        let msg = response.text().await.unwrap_or("No body".to_string());
-        error!("Random name api call failed: {} - {}", status, msg);
-        format!("Rand{}", len)
-    } else {
-        let names: Vec<String> = response.json().await?;
-        names[0].clone()
+    let value = match game_type {
+        GameType::Roulette => SpinSession::from_random_roulette(user_id, random_game).to_json()?,
+        GameType::Duel => SpinSession::from_random_duel(user_id, random_game).to_json()?,
+        GameType::Quiz => QuizSession::from_random(random_game).to_json()?,
+        GameType::Imposter => ImposterSession::from_random(user_id, random_game).to_json()?,
     };
 
-    let game = take_random_game(state.get_pool(), &game_type).await?;
-
-    let (value, game_base) = match game_type {
-        GameType::Roulette => {
-            let game_base = GameBase::new(game_name, GameType::Roulette);
-            let session_json = SpinSession::from_random_roulette(user_id, game).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Duel => {
-            let game_base = GameBase::new(game_name, GameType::Duel);
-            let session_json = SpinSession::from_random_duel(user_id, game).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Quiz => {
-            let game_base = GameBase::new(game_name, GameType::Quiz);
-            let session_json = QuizSession::from_random(game).to_json()?;
-            (session_json, game_base)
-        }
-        GameType::Imposter => {
-            let game_base = GameBase::new(game_name, GameType::Imposter);
-            let session_json = ImposterSession::from_random(user_id, game).to_json()?;
-            (session_json, game_base)
-        }
-    };
-
-    let client = state.get_client();
     let gs_client = state.get_gs_client();
     let pool = state.get_pool();
 
-    // Store game base
-    create_game_base_db(pool, &game_base).await?;
-    info!("Persisted interactive game base from random game");
-
-    // Invalidate cache for this game type and category
-    let cache = state.get_cache().clone();
-    let category = game_base.category.clone();
-    let game_type_clone = game_type;
-    let state_pointer = state.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = cache.invalidate(game_type_clone, &category).await {
-            warn!(
-                "Failed to invalidate cache after creating random game {}: {}",
-                game_base.id, e
-            );
-            state_pointer
-                .syslog()
-                .action(LogAction::Create)
-                .ceverity(LogCeverity::Warning)
-                .function("create_random_interactive_game")
-                .subject(subject_id)
-                .description("Failed to invalidate game cache after random creation")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_type": game_type_clone,
-                }))
-                .log_async();
-        }
-    });
-
     let key = state
         .get_vault()
-        .create_key(pool, game_type, false, game_base.id)?;
+        .create_key(pool, game_type, false, game_id)?;
+
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -531,13 +333,13 @@ async fn create_random_interactive_game(
     debug!("Created key: {}", key);
 
     gs_client
-        .initiate_game_session(client, &game_type, &payload)
+        .initiate_game_session(&game_type, &payload)
         .await?;
 
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
-        game_id: game_base.id,
+        game_id,
         hub_name: hub_address,
         is_draft: false,
     };
@@ -569,55 +371,37 @@ async fn get_games(
     Ok((StatusCode::OK, Json(page)))
 }
 
+/// Only called by `tero.session`.
 pub async fn persist_standalone_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
-    Json(request): Json<InteractiveEnvelope>,
+    Json(payload): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
         warn!("Integration {} attempted to store a static game", id);
         return Err(ServerError::AccessDenied);
     }
 
-    let (game_id, iterations) = match game_type {
+    // TODO - invalidate cache!!
+
+    let game_base = GameBase::new(payload.name, game_type, payload.category);
+    let mut tx = state.get_pool().begin().await?;
+    create_game_base(tx.as_mut(), &game_base).await?;
+
+    match game_type {
         GameType::Quiz => {
-            let session: QuizSession = serde_json::from_value(request.payload)?;
-            let (game_id, iterations) = (session.game_id, session.rounds.len());
-            create_quiz_game(state.get_pool(), &session.into()).await?;
-            (game_id, iterations)
+            let session: QuizSession = serde_json::from_value(payload.payload)?;
+            create_quiz_game(tx.as_mut(), &session.into()).await?;
         }
         _ => {
             return Err(ServerError::Api(
                 StatusCode::BAD_REQUEST,
-                "This game does not have static persist support".into(),
+                format!("Game type {} not supported", game_type.as_str()),
             ));
         }
     };
-
-    tokio::task::spawn(async move {
-        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, Some(iterations)).await {
-            tracing::error!(
-                "Failed to sync and update for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
-            state
-                .syslog()
-                .action(LogAction::Update)
-                .ceverity(LogCeverity::Warning)
-                .function("persist_standalone_game")
-                .subject(subject_id)
-                .description("Failed to sync update game base after persisting standalone game")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_id": game_id,
-                    "game_type": game_type,
-                }))
-                .log_async();
-        }
-    });
+    tx.commit().await?;
 
     info!("Persisted standalone game");
     Ok(StatusCode::CREATED)
@@ -629,10 +413,10 @@ async fn persist_interactive_game(
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
     Path(game_type): Path<GameType>,
-    Json(request): Json<InteractiveEnvelope>,
+    Json(payload): Json<InteractiveEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
-        warn!("Non-integration user attempted to persist game session");
+        warn!("User attempted to persist game session");
         return Err(ServerError::AccessDenied);
     };
 
@@ -640,54 +424,29 @@ async fn persist_interactive_game(
         return Err(ServerError::Permission(missing));
     }
 
-    let pool = state.get_pool();
+    // TODO - invalidate cache!!
 
-    let (game_id, iterations) = match game_type {
+    let mut tx = state.get_pool().begin().await?;
+    let game_base = GameBase::new(payload.name, game_type, payload.category);
+    create_game_base(tx.as_mut(), &game_base).await?;
+
+    match game_type {
         GameType::Roulette | GameType::Duel => {
-            let session: SpinSession = serde_json::from_value(request.payload)?;
-            let (game_id, iterations) = (session.game_id, session.rounds.len());
-            create_spin_game(pool, &session.into()).await?;
-            (game_id, iterations)
+            let session: SpinSession = serde_json::from_value(payload.payload)?;
+            create_spin_game(tx.as_mut(), &session.into()).await?;
         }
         GameType::Quiz => {
-            let session: QuizSession = serde_json::from_value(request.payload)?;
-            let (game_id, iterations) = (session.game_id, session.rounds.len());
-            create_quiz_game(pool, &session.into()).await?;
-            (game_id, iterations)
+            let session: QuizSession = serde_json::from_value(payload.payload)?;
+            create_quiz_game(tx.as_mut(), &session.into()).await?;
         }
         GameType::Imposter => {
-            let session: ImposterSession = serde_json::from_value(request.payload)?;
-            let (game_id, iterations) = (session.game_id, session.rounds.len());
-            create_imposter_game(pool, &session.into()).await?;
-            (game_id, iterations)
+            let session: ImposterSession = serde_json::from_value(payload.payload)?;
+            create_imposter_game(tx.as_mut(), &session.into()).await?;
         }
     };
+    tx.commit().await?;
 
-    tokio::task::spawn(async move {
-        if let Err(e) = sync_and_update_base(state.get_pool(), game_id, Some(iterations)).await {
-            error!(
-                "Failed to sync and update for {} {}: {}",
-                game_type.as_str(),
-                game_id,
-                e
-            );
-            state
-                .syslog()
-                .action(LogAction::Update)
-                .ceverity(LogCeverity::Warning)
-                .function("persist_interactive_game")
-                .subject(subject_id.clone())
-                .description("Sync and update base game failed")
-                .metadata(json!({
-                    "error": e.to_string(),
-                    "game_id": game_id,
-                    "game_type": game_type,
-                }))
-                .log_async();
-        }
-    });
-
-    info!("Persisted interactive specialized game");
+    info!("Persisted interactive game");
     Ok(StatusCode::CREATED)
 }
 

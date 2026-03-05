@@ -1,11 +1,11 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres};
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::models::imposter_game::ImposterGame;
 
 pub async fn create_imposter_game(
-    pool: &Pool<Postgres>,
+    executor: impl Executor<'_, Database = Postgres>,
     game: &ImposterGame,
 ) -> Result<(), sqlx::Error> {
     let row = sqlx::query!(
@@ -16,7 +16,7 @@ pub async fn create_imposter_game(
         game.id,
         &game.rounds
     )
-    .execute(pool)
+    .execute(executor)
     .await?;
 
     if row.rows_affected() == 0 {

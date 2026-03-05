@@ -25,21 +25,8 @@ pub struct PagedResponse<T> {
     pub has_prev: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct PatchGameBaseRequest {
-    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
-    pub name: Option<String>,
-    pub category: Option<GameCategory>,
-}
-
 pub trait GameConverter {
     fn to_json(&self) -> Result<serde_json::Value, serde_json::Error>;
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct DeleteGameBaseResponse {
-    pub game_type: GameType,
-    pub category: GameCategory,
 }
 
 #[allow(dead_code)]
@@ -64,13 +51,13 @@ pub struct GameBase {
 }
 
 impl GameBase {
-    pub fn new(name: String, game_type: GameType) -> Self {
+    pub fn new(name: String, game_type: GameType, category: GameCategory) -> Self {
         Self {
             id: Uuid::new_v4(),
             name,
             game_type,
-            category: GameCategory::Mixed,
-            iterations: 0,
+            category,
+            iterations: 1, // If the user manages to get to the create screen the game has been played 1 time.
             times_played: 0,
             last_played: Utc::now(),
             synced: false,
@@ -154,8 +141,11 @@ impl GameCacheKey {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct InteractiveEnvelope {
+    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
+    pub name: String,
+    pub category: GameCategory,
     pub payload: serde_json::Value,
 }
 

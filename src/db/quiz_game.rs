@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres};
 use uuid::Uuid;
 
 use crate::models::{error::ServerError, quiz_game::QuizGame};
@@ -20,7 +20,10 @@ pub async fn get_quiz_game_by_id(
     .await
 }
 
-pub async fn create_quiz_game(pool: &Pool<Postgres>, game: &QuizGame) -> Result<(), ServerError> {
+pub async fn create_quiz_game<'e, E>(executor: E, game: &QuizGame) -> Result<(), ServerError>
+where
+    E: Executor<'e, Database = Postgres>,
+{
     sqlx::query!(
         r#"
         INSERT INTO "quiz_game" (id, rounds)
@@ -31,7 +34,7 @@ pub async fn create_quiz_game(pool: &Pool<Postgres>, game: &QuizGame) -> Result<
         game.id,
         &game.rounds
     )
-    .execute(pool)
+    .execute(executor)
     .await?;
 
     Ok(())

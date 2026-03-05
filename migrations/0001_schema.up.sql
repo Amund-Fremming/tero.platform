@@ -109,8 +109,7 @@ CREATE TABLE "game_base" (
     "category" game_category NOT NULL DEFAULT 'mixed',
     "iterations" INTEGER NOT NULL DEFAULT 0,
     "times_played" INTEGER NOT NULL DEFAULT 0,
-    "last_played" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "synced" BOOLEAN NOT NULL DEFAULT false
+    "last_played" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE "quiz_game" (

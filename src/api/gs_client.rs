@@ -1,4 +1,4 @@
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
@@ -36,17 +36,22 @@ pub struct JoinGameResponse {
 
 #[derive(Debug, Clone)]
 pub struct GSClient {
+    client: reqwest::Client,
     domain: String,
 }
 
 impl GSClient {
-    pub fn new(domain: impl Into<String>) -> Self {
+    pub fn new(domain: impl Into<String>, client: reqwest::Client) -> Self {
         let domain = domain.into();
-        Self { domain }
+        Self { domain, client }
     }
 
-    pub async fn health_check(&self, client: &Client) -> Result<(), GSClientError> {
-        let response = client.get(format!("{}/health", self.domain)).send().await?;
+    pub async fn health_check(&self) -> Result<(), GSClientError> {
+        let response = self
+            .client
+            .get(format!("{}/health", self.domain))
+            .send()
+            .await?;
         if !response.status().is_success() {
             return Err(GSClientError::ApiError(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -59,12 +64,12 @@ impl GSClient {
 
     pub async fn initiate_game_session(
         &self,
-        client: &Client,
         game_type: &GameType,
         payload: &InitiateGameRequest,
     ) -> Result<(), GSClientError> {
         let url = format!("{}/session/initiate/{}", self.domain, game_type.as_str());
-        let response = client
+        let response = self
+            .client
             .post(&url)
             .header("content-type", "application/json")
             .json(&payload)

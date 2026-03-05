@@ -37,7 +37,7 @@ impl AppState {
     pub async fn from_connection_string(connection_string: &str) -> Result<Arc<Self>, ServerError> {
         let pool = Pool::<Postgres>::connect(connection_string).await?;
         let client = Client::new();
-        let gs_client = GSClient::new(&CONFIG.server.gs_domain);
+        let gs_client = GSClient::new(&CONFIG.server.gs_domain, client.clone());
 
         let jwks_url = format!("{}.well-known/jwks.json", CONFIG.auth0.domain);
         let response = client.get(jwks_url).send().await?;

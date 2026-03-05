@@ -30,7 +30,7 @@ async fn health_detailed(
     let platform = true;
     let db_status = db::health::health_check(state.get_pool()).await.is_ok();
 
-    let session_status = match state.get_gs_client().health_check(state.get_client()).await {
+    let session_status = match state.get_gs_client().health_check().await {
         Ok(_) => true,
         Err(e) => {
             tracing::error!("Game session health check failed: {}", e);
