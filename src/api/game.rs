@@ -282,11 +282,13 @@ async fn initiate_interactive_game(
         value,
     };
 
-    // TODO tokio join here
-    increment_times_played(state.get_pool(), game_id).await?;
-    gs_client
-        .initiate_game_session(&game_type, &payload)
-        .await?;
+    let (increment_result, game_result) = tokio::join!(
+        gs_client.initiate_game_session(&game_type, &payload),
+        increment_times_played(state.get_pool(), game_id),
+    );
+
+    increment_result?;
+    game_result?;
 
     let response = InteractiveGameResponse {
         key,
@@ -310,7 +312,7 @@ async fn create_random_interactive_session(
 
     let game_id = Uuid::new_v4();
     let random_game = take_random_game(state.get_pool(), &game_type).await?;
-    // TODO - delete random game when its taken, do in same call
+    // TODO - do i delete random created games, or let them be, then remove if they are later created?, or just never make it possible to persist random games?
 
     let value = match game_type {
         GameType::Roulette => SpinSession::from_random_roulette(user_id, random_game).to_json()?,
@@ -383,9 +385,7 @@ pub async fn persist_standalone_game(
         return Err(ServerError::AccessDenied);
     }
 
-    // TODO - invalidate cache!!
-
-    let game_base = GameBase::new(payload.name, game_type, payload.category);
+    let game_base = GameBase::new(payload.name, game_type, payload.category.clone());
     let mut tx = state.get_pool().begin().await?;
     create_game_base(tx.as_mut(), &game_base).await?;
 
@@ -402,6 +402,11 @@ pub async fn persist_standalone_game(
         }
     };
     tx.commit().await?;
+
+    state
+        .get_cache()
+        .invalidate(game_type, &payload.category)
+        .await?;
 
     info!("Persisted standalone game");
     Ok(StatusCode::CREATED)
@@ -424,10 +429,8 @@ async fn persist_interactive_game(
         return Err(ServerError::Permission(missing));
     }
 
-    // TODO - invalidate cache!!
-
     let mut tx = state.get_pool().begin().await?;
-    let game_base = GameBase::new(payload.name, game_type, payload.category);
+    let game_base = GameBase::new(payload.name, game_type, payload.category.clone());
     create_game_base(tx.as_mut(), &game_base).await?;
 
     match game_type {
@@ -445,6 +448,11 @@ async fn persist_interactive_game(
         }
     };
     tx.commit().await?;
+
+    state
+        .get_cache()
+        .invalidate(game_type, &payload.category)
+        .await?;
 
     info!("Persisted interactive game");
     Ok(StatusCode::CREATED)
