@@ -25,12 +25,19 @@ pub struct PagedResponse<T> {
     pub has_prev: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct PatchGameBaseRequest {
+    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
+    pub name: Option<String>,
+    pub category: Option<GameCategory>,
+}
+
 pub trait GameConverter {
     fn to_json(&self) -> Result<serde_json::Value, serde_json::Error>;
 }
 
 #[derive(Debug, sqlx::FromRow)]
-pub struct DeleteGameResult {
+pub struct DeleteGameBaseResponse {
     pub game_type: GameType,
     pub category: GameCategory,
 }
@@ -57,12 +64,12 @@ pub struct GameBase {
 }
 
 impl GameBase {
-    pub fn from_request(request: &CreateGameRequest, game_type: GameType) -> Self {
+    pub fn new(name: String, game_type: GameType) -> Self {
         Self {
             id: Uuid::new_v4(),
-            name: request.name.clone(),
+            name,
             game_type,
-            category: request.category.clone(),
+            category: GameCategory::Mixed,
             iterations: 0,
             times_played: 0,
             last_played: Utc::now(),
@@ -133,7 +140,7 @@ impl GameType {
 #[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Clone)]
 pub struct GameCacheKey {
     pub page_num: u16,
-    pub game_type: GameType,
+    pub game_type: Option<GameType>,
     pub category: Option<GameCategory>,
 }
 
@@ -141,7 +148,7 @@ impl GameCacheKey {
     pub fn from_request(query: &GamePagedRequest) -> Self {
         Self {
             page_num: query.page_num.unwrap_or(0),
-            game_type: query.game_type.unwrap_or(GameType::Quiz),
+            game_type: query.game_type,
             category: query.category.clone(),
         }
     }
@@ -150,22 +157,6 @@ impl GameCacheKey {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InteractiveEnvelope {
     pub payload: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct CreateGameRequest {
-    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
-    pub name: String,
-    pub category: GameCategory,
-}
-
-impl CreateGameRequest {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            category: GameCategory::Mixed,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

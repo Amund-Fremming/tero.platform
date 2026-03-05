@@ -3,6 +3,7 @@ mod tests {
     use std::{env, sync::Arc};
 
     use dotenvy::dotenv;
+    use uuid::Uuid;
 
     use crate::{
         models::{app_state::AppState, game_base::GameType},
@@ -25,13 +26,14 @@ mod tests {
         let vault = state.get_vault();
 
         for num in 0..10_000 {
+            let game_id = Uuid::new_v4();
             let word = vault
-                .create_key(state.get_pool(), GameType::Quiz, false)
+                .create_key(state.get_pool(), GameType::Quiz, false, game_id)
                 .unwrap();
             println!("{} - {}", num + 1, word)
         }
 
-        let result = vault.create_key(state.get_pool(), GameType::Quiz, false);
+        let result = vault.create_key(state.get_pool(), GameType::Quiz, false, Uuid::new_v4());
         assert!(result.is_err());
 
         let error = result.err().unwrap();
@@ -52,7 +54,12 @@ mod tests {
 
             let handle = tokio::spawn(async move {
                 let vault = state_clone.get_vault();
-                match vault.create_key(state_clone.get_pool(), GameType::Quiz, false) {
+                match vault.create_key(
+                    state_clone.get_pool(),
+                    GameType::Quiz,
+                    false,
+                    Uuid::new_v4(),
+                ) {
                     Ok(key) => {
                         //println!("Task {} opprettet nøkkel: {}", i, key);
                         Ok(key)

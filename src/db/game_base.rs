@@ -10,11 +10,11 @@ use crate::{
     models::{
         error::ServerError,
         game_base::{
-            DeleteGameResult, GameBase, GamePagedRequest, GameType, PagedResponse, RandomGame,
+            DeleteGameBaseResponse, GameBase, GamePagedRequest, GameType, PagedResponse,
+            PatchGameBaseRequest, RandomGame,
         },
     },
 };
-
 pub async fn create_game_base(pool: &Pool<Postgres>, game: &GameBase) -> Result<(), sqlx::Error> {
     let times_played = 0;
     let row = sqlx::query!(
@@ -140,8 +140,11 @@ pub async fn sync_and_update_base(
     Ok(())
 }
 
-pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameResult, sqlx::Error> {
-    let row = sqlx::query_as::<_, DeleteGameResult>(
+pub async fn delete_game(
+    pool: &Pool<Postgres>,
+    id: Uuid,
+) -> Result<DeleteGameBaseResponse, sqlx::Error> {
+    let row = sqlx::query_as::<_, DeleteGameBaseResponse>(
         r#"
         DELETE FROM "game_base"
         WHERE id = $1
@@ -152,10 +155,36 @@ pub async fn delete_game(pool: &Pool<Postgres>, id: Uuid) -> Result<DeleteGameRe
     .fetch_one(pool)
     .await?;
 
-    Ok(DeleteGameResult {
+    Ok(DeleteGameBaseResponse {
         game_type: row.game_type,
         category: row.category,
     })
+}
+
+pub async fn patch_game_base_db(
+    pool: &Pool<Postgres>,
+    id: Uuid,
+    request: &PatchGameBaseRequest,
+) -> Result<(), ServerError> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "game_base" SET
+            name = COALESCE($1, name),
+            category = COALESCE($2, category)
+        WHERE id = $3
+        "#,
+        request.name,
+        request.category as _,
+        id
+    )
+    .execute(pool)
+    .await?;
+
+    if row.rows_affected() == 0 {
+        warn!("Patch on game base had no changes");
+    }
+
+    Ok(())
 }
 
 pub async fn save_game(

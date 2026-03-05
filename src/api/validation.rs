@@ -134,7 +134,7 @@ pub fn validate_person_name(name: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// Validate game name: 3-100 chars, not just whitespace
+/// Validate game name: 3-12 chars, not just whitespace
 pub fn validate_game_name(name: &str) -> Result<(), ValidationError> {
     let trimmed = name.trim();
     let len = trimmed.len();
@@ -144,9 +144,9 @@ pub fn validate_game_name(name: &str) -> Result<(), ValidationError> {
             .with_message("Game name must be at least 3 characters".into()));
     }
 
-    if len > 100 {
+    if len > 12 {
         return Err(ValidationError::new("game_name_too_long")
-            .with_message("Game name must be at most 100 characters".into()));
+            .with_message("Game name must be at most 12 characters".into()));
     }
 
     // Check if it's not just whitespace/special chars

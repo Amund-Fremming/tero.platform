@@ -8,6 +8,7 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, warn};
+use uuid::Uuid;
 
 use crate::{db::key_vault::get_word_sets, models::game_base::GameType};
 
@@ -31,6 +32,7 @@ pub struct VaultValue {
     timestamp: u64,
     game_type: GameType,
     is_draft: bool,
+    game_id: Uuid,
 }
 
 pub struct KeyVault {
@@ -59,9 +61,9 @@ impl KeyVault {
         Ok(vault)
     }
 
-    pub fn key_active(&self, key: &(String, String)) -> Option<(GameType, bool)> {
+    pub fn key_active(&self, key: &(String, String)) -> Option<(GameType, bool, Uuid)> {
         match self.active_keys.get(key) {
-            Some(value) => Some((value.game_type, value.is_draft)),
+            Some(value) => Some((value.game_type, value.is_draft, value.game_id)),
             None => None,
         }
     }
@@ -83,6 +85,7 @@ impl KeyVault {
         _pool: &Pool<Postgres>,
         game_type: GameType,
         is_draft: bool,
+        game_id: Uuid,
     ) -> Result<String, KeyVaultError> {
         for _ in 0..100 {
             let Ok((idx1, idx2)) = self.random_idx() else {
@@ -103,6 +106,7 @@ impl KeyVault {
                 timestamp,
                 game_type,
                 is_draft,
+                game_id,
             };
 
             self.active_keys.insert(key.clone(), value);
@@ -122,6 +126,7 @@ impl KeyVault {
                     timestamp,
                     game_type,
                     is_draft,
+                    game_id,
                 };
 
                 self.active_keys.insert(key.clone(), value);

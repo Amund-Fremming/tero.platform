@@ -1,6 +1,7 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::error;
+use uuid::Uuid;
 
 use crate::models::game_base::{GameType, InitiateGameRequest};
 
@@ -20,6 +21,7 @@ pub enum GSClientError {
 pub struct InteractiveGameResponse {
     pub key: String,
     pub hub_name: String,
+    pub game_id: Uuid,
     pub is_draft: bool,
 }
 
@@ -27,6 +29,7 @@ pub struct InteractiveGameResponse {
 pub struct JoinGameResponse {
     pub game_key: String,
     pub hub_name: String,
+    pub game_id: Uuid,
     pub game_type: GameType,
     pub is_draft: bool,
 }

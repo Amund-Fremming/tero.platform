@@ -8,7 +8,8 @@ use axum::{
 };
 
 use crate::{
-    api::validation::ValidatedJson, db::imposter_game::get_imposter_game_by_id,
+    api::validation::ValidatedJson,
+    db::{game_base::patch_game_base_db, imposter_game::get_imposter_game_by_id},
     models::game_base::GamePagedRequest,
 };
 use rand::{Rng, SeedableRng};
@@ -25,8 +26,8 @@ use crate::{
     db::{
         self,
         game_base::{
-            create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
-            sync_and_update_base, take_random_game,
+            create_game_base as create_game_base_db, delete_saved_game, get_game_page,
+            get_saved_games_page, save_game, sync_and_update_base, take_random_game,
         },
         imposter_game::create_imposter_game,
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
@@ -37,8 +38,8 @@ use crate::{
         auth::Claims,
         error::ServerError,
         game_base::{
-            CreateGameRequest, GameBase, GameCacheKey, GameConverter, GameType,
-            InitiateGameRequest, InteractiveEnvelope, ResponseWrapper,
+            GameBase, GameCacheKey, GameConverter, GameType, InitiateGameRequest,
+            InteractiveEnvelope, PatchGameBaseRequest, ResponseWrapper,
         },
         imposter_game::ImposterSession,
         quiz_game::QuizSession,
@@ -54,13 +55,14 @@ use crate::{
 ///     An example would be quiz, quiz is interactive on creation by adding
 ///     questions but standalone when playing.
 pub fn game_routes(state: Arc<AppState>) -> Router {
-    let generic_routes = Router::new()
+    let general_routes = Router::new()
         .route("/page", get(get_games))
-        .route("/{game_id}", delete(delete_game))
+        .route("/{game_id}", delete(delete_game).patch(patch_game_base))
         .route("/free-key/{game_key}", patch(free_game_key))
         .route("/save/{game_id}", post(user_save_game))
         .route("/unsave/{game_id}", delete(user_usaved_game))
         .route("/saved", get(get_saved_games))
+        .route("/{game_type}/create", post(create_game_base))
         .with_state(state.clone());
 
     let static_routes = Router::new()
@@ -72,7 +74,6 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     let session_routes = Router::new()
-        .route("/{game_type}/create", post(create_interactive_game))
         .route("/persist/{game_type}", post(persist_interactive_game))
         .route(
             "/{game_type}/initiate/{game_id}",
@@ -86,7 +87,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     Router::new()
-        .nest("/general", generic_routes)
+        .nest("/general", general_routes)
         .nest("/static", static_routes)
         .nest("/session", session_routes)
 }
@@ -137,6 +138,25 @@ async fn delete_game(
     Ok(StatusCode::OK)
 }
 
+async fn patch_game_base(
+    State(state): State<Arc<AppState>>,
+    Extension(subject_id): Extension<SubjectId>,
+    Extension(_claims): Extension<Claims>,
+    Path(game_id): Path<Uuid>,
+    ValidatedJson(request): ValidatedJson<PatchGameBaseRequest>,
+) -> Result<impl IntoResponse, ServerError> {
+    if let SubjectId::Integration(_) = subject_id {
+        return Err(ServerError::AccessDenied);
+    }
+
+    if request.name.is_none() && request.category.is_none() {
+        return Ok(StatusCode::OK);
+    }
+
+    patch_game_base_db(state.get_pool(), game_id, &request).await?;
+    Ok(StatusCode::OK)
+}
+
 async fn join_interactive_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
@@ -159,7 +179,7 @@ async fn join_interactive_game(
         }
     };
 
-    let Some((game_type, is_draft)) = state.get_vault().key_active(&tuple) else {
+    let Some((game_type, is_draft, game_id)) = state.get_vault().key_active(&tuple) else {
         return Err(ServerError::Api(
             StatusCode::NOT_FOUND,
             "Game with game key does not exist".into(),
@@ -169,6 +189,7 @@ async fn join_interactive_game(
     let response = JoinGameResponse {
         game_key: key_word,
         hub_name: game_type.as_str().to_string(),
+        game_id,
         game_type,
         is_draft,
     };
@@ -176,35 +197,37 @@ async fn join_interactive_game(
     Ok((StatusCode::OK, Json(response)))
 }
 
-async fn create_interactive_game(
+async fn create_game_base(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
-    ValidatedJson(request): ValidatedJson<CreateGameRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     let user_id = match subject_id {
         SubjectId::PseudoUser(id) | SubjectId::BaseUser(id) => id,
         _ => return Err(ServerError::AccessDenied),
     };
 
+    // TODO - use some api or create your own funciton to create random names under 8 chars and over 4.
+    let game_name = "Default".to_string();
+
     let (value, game_base) = match game_type {
         GameType::Roulette => {
-            let game_base = GameBase::from_request(&request, GameType::Roulette);
+            let game_base = GameBase::new(game_name, GameType::Roulette);
             let session_json = SpinSession::new_roulette(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
         GameType::Duel => {
-            let game_base = GameBase::from_request(&request, GameType::Duel);
+            let game_base = GameBase::new(game_name, GameType::Duel);
             let session_json = SpinSession::new_duel(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
         GameType::Quiz => {
-            let game_base = GameBase::from_request(&request, GameType::Quiz);
+            let game_base = GameBase::new(game_name, GameType::Quiz);
             let session_json = QuizSession::new(game_base.id).to_json()?;
             (session_json, game_base)
         }
         GameType::Imposter => {
-            let game_base = GameBase::from_request(&request, GameType::Imposter);
+            let game_base = GameBase::new(game_name, GameType::Imposter);
             let session_json = ImposterSession::new(user_id, game_base.id).to_json()?;
             (session_json, game_base)
         }
@@ -215,7 +238,7 @@ async fn create_interactive_game(
     let pool = state.get_pool();
 
     // Store game base
-    create_game_base(pool, &game_base).await?;
+    create_game_base_db(pool, &game_base).await?;
     info!("Persisted interactive game base");
 
     // Invalidate cache for this game type and category
@@ -245,7 +268,9 @@ async fn create_interactive_game(
         }
     });
 
-    let key = state.get_vault().create_key(pool, game_type, true)?;
+    let key = state
+        .get_vault()
+        .create_key(pool, game_type, true, game_base.id)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -259,6 +284,7 @@ async fn create_interactive_game(
     let response = InteractiveGameResponse {
         key,
         hub_name: game_type.hub_name().to_string(),
+        game_id: game_base.id,
         is_draft: true,
     };
 
@@ -339,16 +365,18 @@ async fn initiate_interactive_game(
     let vault = state.get_vault();
     let pool = state.get_pool();
 
-    let value = match game_type {
+    let (value, game_id) = match game_type {
         GameType::Roulette => {
             let game = get_spin_game_by_id(pool, game_id).await?;
+            let game_id = game.id;
             let session = SpinSession::from_roulette(user_id, game);
-            session.to_json()?
+            (session.to_json()?, game_id)
         }
         GameType::Duel => {
             let game = get_spin_game_by_id(pool, game_id).await?;
+            let game_id = game.id;
             let session = SpinSession::from_duel(user_id, game);
-            session.to_json()?
+            (session.to_json()?, game_id)
         }
         _ => {
             return Err(ServerError::Api(
@@ -358,7 +386,7 @@ async fn initiate_interactive_game(
         }
     };
 
-    let key = vault.create_key(pool, game_type, false)?;
+    let key = vault.create_key(pool, game_type, false, game_id)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -371,6 +399,7 @@ async fn initiate_interactive_game(
     let response = InteractiveGameResponse {
         key,
         hub_name: game_type.hub_name().to_string(),
+        game_id,
         is_draft: false,
     };
 
@@ -412,7 +441,7 @@ async fn create_random_interactive_game(
     };
 
     let mut rng = ChaCha8Rng::from_os_rng();
-    let len = rng.random_range(4..=7);
+    let len = rng.random_range(4..=8);
     let response = state
         .get_client()
         .get(format!(
@@ -423,7 +452,7 @@ async fn create_random_interactive_game(
         .await?;
     let status = response.status();
 
-    let name = if !status.is_success() {
+    let game_name = if !status.is_success() {
         let msg = response.text().await.unwrap_or("No body".to_string());
         error!("Random name api call failed: {} - {}", status, msg);
         format!("Rand{}", len)
@@ -432,27 +461,26 @@ async fn create_random_interactive_game(
         names[0].clone()
     };
 
-    let request = CreateGameRequest::new(name);
     let game = take_random_game(state.get_pool(), &game_type).await?;
 
     let (value, game_base) = match game_type {
         GameType::Roulette => {
-            let game_base = GameBase::from_request(&request, GameType::Roulette);
+            let game_base = GameBase::new(game_name, GameType::Roulette);
             let session_json = SpinSession::from_random_roulette(user_id, game).to_json()?;
             (session_json, game_base)
         }
         GameType::Duel => {
-            let game_base = GameBase::from_request(&request, GameType::Duel);
+            let game_base = GameBase::new(game_name, GameType::Duel);
             let session_json = SpinSession::from_random_duel(user_id, game).to_json()?;
             (session_json, game_base)
         }
         GameType::Quiz => {
-            let game_base = GameBase::from_request(&request, GameType::Quiz);
+            let game_base = GameBase::new(game_name, GameType::Quiz);
             let session_json = QuizSession::from_random(game).to_json()?;
             (session_json, game_base)
         }
         GameType::Imposter => {
-            let game_base = GameBase::from_request(&request, GameType::Imposter);
+            let game_base = GameBase::new(game_name, GameType::Imposter);
             let session_json = ImposterSession::from_random(user_id, game).to_json()?;
             (session_json, game_base)
         }
@@ -463,7 +491,7 @@ async fn create_random_interactive_game(
     let pool = state.get_pool();
 
     // Store game base
-    create_game_base(pool, &game_base).await?;
+    create_game_base_db(pool, &game_base).await?;
     info!("Persisted interactive game base from random game");
 
     // Invalidate cache for this game type and category
@@ -493,7 +521,9 @@ async fn create_random_interactive_game(
         }
     });
 
-    let key = state.get_vault().create_key(pool, game_type, false)?;
+    let key = state
+        .get_vault()
+        .create_key(pool, game_type, false, game_base.id)?;
     let payload = InitiateGameRequest {
         key: key.clone(),
         value,
@@ -507,6 +537,7 @@ async fn create_random_interactive_game(
     let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
+        game_id: game_base.id,
         hub_name: hub_address,
         is_draft: false,
     };
