@@ -85,7 +85,7 @@ pub async fn get_game_page(
     pool: &Pool<Postgres>,
     request: &GamePagedRequest,
 ) -> Result<PagedResponse<GameBase>, sqlx::Error> {
-    let page_size = CONFIG.server.page_size as u16;
+    let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
     let page_num = request.page_num.unwrap_or(0);
     let game_type_str = request.game_type.unwrap_or(GameType::Quiz).as_str();
@@ -124,7 +124,7 @@ pub async fn get_game_page(
         games.pop();
     }
     let page = PagedResponse {
-        page_num: page_num,
+        page_num,
         items: games,
         has_next,
         has_prev: page_num > 0,
@@ -227,7 +227,7 @@ pub async fn get_saved_games_page(
         games.pop();
     }
     let page = PagedResponse {
-        page_num: page_num,
+        page_num,
         items: games,
         has_next,
         has_prev: page_num > 0,

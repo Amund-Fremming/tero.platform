@@ -2,6 +2,8 @@
 reset-db:
     cargo sqlx database reset --force -y
 
+clippy:
+    cargo clippy --all-features --all-targets -- -D warnings
 
 # Simple git command
 push msg:

@@ -39,7 +39,7 @@ pub async fn get_game_tips_page(
     pool: &Pool<Postgres>,
     page_num: u16,
 ) -> Result<PagedResponse<GameTip>, sqlx::Error> {
-    let page_size = CONFIG.server.page_size as u16;
+    let page_size = CONFIG.server.page_size;
     let offset = (page_size * page_num) as i64;
     let limit = (page_size + 1) as i64;
 

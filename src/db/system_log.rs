@@ -17,7 +17,7 @@ pub async fn get_system_log_page(
     request: SyslogPageQuery,
 ) -> Result<PagedResponse<SystemLog>, sqlx::Error> {
     let page_num = request.page_num.unwrap_or(0);
-    let page_size = CONFIG.server.page_size as u16;
+    let page_size = CONFIG.server.page_size;
     let offset = (page_size * page_num) as i64;
     let limit = (page_size + 1) as i64;
 
