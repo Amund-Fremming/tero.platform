@@ -6,15 +6,16 @@ use crate::models::imposter_game::ImposterGame;
 
 pub async fn create_imposter_game(
     executor: impl Executor<'_, Database = Postgres>,
-    game: &ImposterGame,
+    game_id: Uuid,
+    rounds: &Vec<String>,
 ) -> Result<(), sqlx::Error> {
     let row = sqlx::query!(
         r#"
         INSERT INTO "imposter_game" ("id", "rounds")
         VALUES ($1, $2); 
         "#,
-        game.id,
-        &game.rounds
+        game_id,
+        rounds
     )
     .execute(executor)
     .await?;

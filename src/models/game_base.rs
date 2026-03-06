@@ -47,20 +47,18 @@ pub struct GameBase {
     pub iterations: i32,
     pub times_played: i32,
     pub last_played: DateTime<Utc>,
-    pub synced: bool,
 }
 
 impl GameBase {
-    pub fn new(name: String, game_type: GameType, category: GameCategory) -> Self {
+    pub fn new(name: String, game_type: GameType, category: GameCategory, iterations: i32) -> Self {
         Self {
             id: Uuid::new_v4(),
             name,
             game_type,
             category,
-            iterations: 1, // If the user manages to get to the create screen the game has been played 1 time.
-            times_played: 0,
+            iterations,
+            times_played: 1, // If the user manages to get to the create screen the game has been played 1 time.
             last_played: Utc::now(),
-            synced: false,
         }
     }
 }
@@ -142,7 +140,15 @@ impl GameCacheKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct InteractiveEnvelope {
+pub struct CreateStaticGameRequest {
+    #[validate(custom(function = "crate::api::validation::validate_game_name"))]
+    pub name: String,
+    pub category: GameCategory,
+    pub rounds: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct InteractiveGameEnvelope {
     #[validate(custom(function = "crate::api::validation::validate_game_name"))]
     pub name: String,
     pub category: GameCategory,

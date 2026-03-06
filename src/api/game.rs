@@ -9,7 +9,7 @@ use axum::{
 
 use crate::{
     db::{game_base::increment_times_played, imposter_game::get_imposter_game_by_id},
-    models::game_base::GamePagedRequest,
+    models::game_base::{CreateStaticGameRequest, GamePagedRequest},
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -36,7 +36,7 @@ use crate::{
         error::ServerError,
         game_base::{
             GameBase, GameCacheKey, GameConverter, GameType, InitiateGameRequest,
-            InteractiveEnvelope, ResponseWrapper,
+            InteractiveGameEnvelope, ResponseWrapper,
         },
         imposter_game::ImposterSession,
         quiz_game::QuizSession,
@@ -98,7 +98,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
             "/{game_type}/initiate/{game_id}",
             get(initiate_standalone_game),
         )
-        .route("/persist/{game_type}", post(persist_standalone_game))
+        .route("/persist/{game_type}", post(persist_static_game))
         .with_state(state.clone());
 
     let session_routes = Router::new()
@@ -373,26 +373,32 @@ async fn get_games(
     Ok((StatusCode::OK, Json(page)))
 }
 
-/// Only called by `tero.session`.
-pub async fn persist_standalone_game(
+/// Called by user
+pub async fn persist_static_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
-    Json(payload): Json<InteractiveEnvelope>,
+    Json(payload): Json<CreateStaticGameRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     if let SubjectId::Integration(id) = subject_id {
         warn!("Integration {} attempted to store a static game", id);
         return Err(ServerError::AccessDenied);
     }
 
-    let game_base = GameBase::new(payload.name, game_type, payload.category.clone());
+    let game_base = GameBase::new(
+        payload.name,
+        game_type,
+        payload.category.clone(),
+        payload.rounds.len() as i32,
+    );
+
     let mut tx = state.get_pool().begin().await?;
     create_game_base(tx.as_mut(), &game_base).await?;
 
     match game_type {
-        GameType::Quiz => {
-            let session: QuizSession = serde_json::from_value(payload.payload)?;
-            create_quiz_game(tx.as_mut(), &session.into()).await?;
+        GameType::Quiz => create_quiz_game(tx.as_mut(), game_base.id, &payload.rounds).await?,
+        GameType::Imposter => {
+            create_imposter_game(tx.as_mut(), game_base.id, &payload.rounds).await?
         }
         _ => {
             return Err(ServerError::Api(
@@ -418,7 +424,7 @@ async fn persist_interactive_game(
     Extension(subject_id): Extension<SubjectId>,
     Extension(claims): Extension<Claims>,
     Path(game_type): Path<GameType>,
-    Json(payload): Json<InteractiveEnvelope>,
+    Json(payload): Json<InteractiveGameEnvelope>,
 ) -> Result<impl IntoResponse, ServerError> {
     let SubjectId::Integration(_) = subject_id else {
         warn!("User attempted to persist game session");
@@ -430,23 +436,28 @@ async fn persist_interactive_game(
     }
 
     let mut tx = state.get_pool().begin().await?;
-    let game_base = GameBase::new(payload.name, game_type, payload.category.clone());
-    create_game_base(tx.as_mut(), &game_base).await?;
 
-    match game_type {
+    let game_base = match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(payload.payload)?;
+            let game_base = GameBase::new(
+                payload.name,
+                game_type,
+                payload.category.clone(),
+                session.rounds.len() as i32,
+            );
             create_spin_game(tx.as_mut(), &session.into()).await?;
+            game_base
         }
-        GameType::Quiz => {
-            let session: QuizSession = serde_json::from_value(payload.payload)?;
-            create_quiz_game(tx.as_mut(), &session.into()).await?;
-        }
-        GameType::Imposter => {
-            let session: ImposterSession = serde_json::from_value(payload.payload)?;
-            create_imposter_game(tx.as_mut(), &session.into()).await?;
+        _ => {
+            return Err(ServerError::Api(
+                StatusCode::BAD_REQUEST,
+                format!("Game type {} not supported", game_type.as_str()),
+            ));
         }
     };
+
+    create_game_base(tx.as_mut(), &game_base).await?;
     tx.commit().await?;
 
     state

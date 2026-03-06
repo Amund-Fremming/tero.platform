@@ -20,7 +20,11 @@ pub async fn get_quiz_game_by_id(
     .await
 }
 
-pub async fn create_quiz_game<'e, E>(executor: E, game: &QuizGame) -> Result<(), ServerError>
+pub async fn create_quiz_game<'e, E>(
+    executor: E,
+    game_id: Uuid,
+    rounds: &Vec<String>,
+) -> Result<(), ServerError>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -31,8 +35,8 @@ where
         ON CONFLICT (id) DO UPDATE SET
             rounds = EXCLUDED.rounds
         "#,
-        game.id,
-        &game.rounds
+        game_id,
+        rounds
     )
     .execute(executor)
     .await?;

@@ -105,10 +105,9 @@ pub async fn get_game_page(
             category,
             iterations,
             times_played,
-            last_played,
-            synced
+            last_played
         FROM "game_base"
-        WHERE game_type = '{}' {} AND synced = true
+        WHERE game_type = '{}' {} 
         ORDER BY times_played DESC
         LIMIT {} OFFSET {}
         "#,
@@ -206,11 +205,10 @@ pub async fn get_saved_games_page(
             base.iterations,
             base.times_played,
             base.last_played,
-            base.synced
         FROM "game_base" base
         JOIN "saved_game" saved
         ON base.id = saved.base_id
-        WHERE synced = true AND saved.user_id = $1 AND base.game_type = $2
+        WHERE saved.user_id = $1 AND base.game_type = $2
         LIMIT {} OFFSET {}
         "#,
         limit, offset
