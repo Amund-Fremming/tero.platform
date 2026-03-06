@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"game_base\"\n        SET times_played = times_played + 1\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "24876b915d79def20e92ce5b0c57dd47ac3b82db1ab94f7f5a41fc5410c61db5"
+}

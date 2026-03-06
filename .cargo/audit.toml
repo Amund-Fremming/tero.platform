@@ -1,0 +1,3 @@
+[advisories]
+# rsa: Marvin Attack timing sidechannel — no fix available upstream (used by sqlx-mysql)
+ignore = ["RUSTSEC-2023-0071"]

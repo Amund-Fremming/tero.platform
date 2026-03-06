@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COALESCE((\n                SELECT FLOOR(AVG(cnt))::float8\n                FROM (\n                    SELECT COUNT(*) AS cnt \n                    FROM pseudo_user \n                    WHERE last_active >= CURRENT_DATE - INTERVAL '6 months'\n                    GROUP BY date_trunc('month', last_active)\n                ) t\n            ), 0) AS \"avg_month_users!\",\n            COALESCE((\n                SELECT FLOOR(AVG(cnt))::float8\n                FROM (\n                    SELECT COUNT(*) AS cnt \n                    FROM pseudo_user \n                    WHERE last_active >= CURRENT_DATE - INTERVAL '8 weeks'\n                    GROUP BY date_trunc('week', last_active)\n                ) t\n            ), 0) AS \"avg_week_users!\",\n            COALESCE((\n                SELECT FLOOR(AVG(cnt))::float8\n                FROM (\n                    SELECT COUNT(*) AS cnt \n                    FROM pseudo_user \n                    WHERE last_active >= CURRENT_DATE - INTERVAL '30 days'\n                    GROUP BY last_active::date\n                ) t\n            ), 0) AS \"avg_daily_users!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "avg_month_users!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "avg_week_users!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "avg_daily_users!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "23a16acd4fe8d4c7ed18adc0189ddf67a2e6949008fe6ef49f9a4bd01767f7d6"
+}

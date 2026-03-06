@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Running local CI checks before push..."
+
+cargo fmt --check || { echo "FAIL: cargo fmt --check"; exit 1; }
+cargo audit || { echo "FAIL: cargo audit"; exit 1; }
+cargo deny check || { echo "FAIL: cargo deny check"; exit 1; }
+SQLX_OFFLINE=true cargo clippy -- -D warnings || { echo "FAIL: clippy"; exit 1; }
+SQLX_OFFLINE=true cargo test || { echo "FAIL: cargo test"; exit 1; }
+
+echo "All checks passed. Pushing..."

@@ -5,6 +5,28 @@ reset-db:
 clippy:
     cargo clippy --all-features --all-targets -- -D warnings
 
+# Runs the same checks as CI — use before pushing
+local-ci:
+    @echo "==> fmt"
+    cargo fmt --check
+    @echo "==> audit"
+    cargo audit
+    @echo "==> deny"
+    cargo deny check
+    @echo "==> clippy"
+    SQLX_OFFLINE=true cargo clippy -- -D warnings
+    @echo "==> test"
+    SQLX_OFFLINE=true cargo test
+    @echo "==> build"
+    SQLX_OFFLINE=true cargo build --release
+    @echo "😈 All checks passed."
+
+# Installs git hooks (run once after cloning)
+setup-hooks:
+    cp scripts/pre-push .git/hooks/pre-push
+    chmod +x .git/hooks/pre-push
+    @echo "Git hooks installed."
+
 # Simple git command
 push msg:
     git add .

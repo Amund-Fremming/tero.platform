@@ -7,25 +7,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4 # To access code from the repo
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo crates
-        run: cargo install cargo-audit cargo-deny cargo-chef
+        run: cargo install cargo-audit cargo-deny
 
-      # - name: Security check
-      #   run: cargo audit
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Security check
+        run: cargo audit
 
       - name: Dependency policy check
         run: cargo deny check
 
       - name: Clippy check
-        run: cargo clippy
+        env:
+          SQLX_OFFLINE: true
+        run: cargo clippy -- -D warnings
 
       - name: Unit tests
+        env:
+          SQLX_OFFLINE: true
         run: cargo test
 
       - name: Build
-        run: |
-          cargo chef prepare --recipe-path recipe.json
-          cargo chef cook --recipe-path recipe.json
-          cargo build --release
+        env:
+          SQLX_OFFLINE: true
+        run: cargo build --release

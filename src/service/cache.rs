@@ -169,13 +169,17 @@ mod tests {
 
         // Populate cache
         let _ = cache
-            .get_or(key_quiz_mixed.clone(), async { Ok("quiz_mixed".to_string()) })
+            .get_or(key_quiz_mixed.clone(), async {
+                Ok("quiz_mixed".to_string())
+            })
             .await;
         let _ = cache
             .get_or(key_quiz_boys.clone(), async { Ok("quiz_boys".to_string()) })
             .await;
         let _ = cache
-            .get_or(key_duel_mixed.clone(), async { Ok("duel_mixed".to_string()) })
+            .get_or(key_duel_mixed.clone(), async {
+                Ok("duel_mixed".to_string())
+            })
             .await;
 
         // Invalidate only Quiz + Mixed
