@@ -29,8 +29,8 @@ impl fmt::Display for Runtime {
 impl From<String> for Runtime {
     fn from(value: String) -> Self {
         match value.as_str() {
-            "DEVELOPMENT" => Runtime::Dev,
-            "PRODUCTION" => Runtime::Prod,
+            "dev" => Runtime::Dev,
+            "prd" => Runtime::Prod,
             _ => Runtime::Prod,
         }
     }

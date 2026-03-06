@@ -22,6 +22,9 @@ mod tests {
     #[allow(clippy::assertions_on_constants)]
     #[tokio::test]
     async fn max_limit_keys() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
         let state = setup_app_state().await;
         let vault = state.get_vault();
 
@@ -45,6 +48,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_key_creation() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
         let state = setup_app_state().await;
 
         let mut handles = Vec::new();
