@@ -21,14 +21,13 @@ local-ci:
     SQLX_OFFLINE=true cargo build --release
     @echo "😈 All checks passed."
 
-# Installs git hooks (run once after cloning)
+# Installs git hooks via pre-commit (run once after cloning)
 setup-hooks:
-    cp scripts/pre-push .git/hooks/pre-push
-    chmod +x .git/hooks/pre-push
+    pre-commit install --hook-type pre-commit --hook-type pre-push
     @echo "Git hooks installed."
 
-# Simple git command
-push msg:
+# Runs CI checks then commits and pushes
+push msg: local-ci
     git add .
     git commit -m "{{msg}}"
     git push

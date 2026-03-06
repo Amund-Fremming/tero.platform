@@ -1,0 +1,39 @@
+repos:
+  - repo: local
+    hooks:
+      # --- pre-commit: fast checks ---
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --check
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: env SQLX_OFFLINE=true cargo clippy -- -D warnings
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      # --- pre-push: slower checks ---
+      - id: cargo-audit
+        name: cargo audit
+        entry: cargo audit
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: cargo-deny
+        name: cargo deny
+        entry: cargo deny check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: cargo-test
+        name: cargo test
+        entry: env SQLX_OFFLINE=true cargo test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
