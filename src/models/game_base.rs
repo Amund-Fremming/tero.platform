@@ -50,9 +50,15 @@ pub struct GameBase {
 }
 
 impl GameBase {
-    pub fn new(name: String, game_type: GameType, category: GameCategory, iterations: i32) -> Self {
+    pub fn new(
+        id: Uuid,
+        name: String,
+        game_type: GameType,
+        category: GameCategory,
+        iterations: i32,
+    ) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id,
             name,
             game_type,
             category,

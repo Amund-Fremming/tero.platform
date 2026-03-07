@@ -386,6 +386,7 @@ pub async fn persist_static_game(
     }
 
     let game_base = GameBase::new(
+        Uuid::new_v4(),
         payload.name,
         game_type,
         payload.category.clone(),
@@ -437,15 +438,17 @@ async fn persist_interactive_game(
 
     let mut tx = state.get_pool().begin().await?;
 
-    let game_base = match game_type {
+    match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(payload.payload)?;
             let game_base = GameBase::new(
+                session.game_id,
                 payload.name,
                 game_type,
                 payload.category.clone(),
                 session.rounds.len() as i32,
             );
+            create_game_base(tx.as_mut(), &game_base).await?;
             create_spin_game(tx.as_mut(), &session.into()).await?;
             game_base
         }
@@ -457,7 +460,6 @@ async fn persist_interactive_game(
         }
     };
 
-    create_game_base(tx.as_mut(), &game_base).await?;
     tx.commit().await?;
 
     state
