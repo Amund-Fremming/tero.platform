@@ -13,10 +13,10 @@ use sqlx::{Pool, Postgres};
 use tracing::warn;
 
 use crate::{
+    app_state::AppState,
     config::app_config::CONFIG,
     db::user::{ensure_pseudo_user, get_base_user_by_auth0_id},
     models::{
-        app_state::AppState,
         auth::{Claims, Jwks},
         error::ServerError,
         integration::{INTEGRATION_NAMES, IntegrationName},

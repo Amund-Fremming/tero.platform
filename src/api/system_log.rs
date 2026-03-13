@@ -11,9 +11,9 @@ use axum::{
 use reqwest::StatusCode;
 
 use crate::{
+    app_state::AppState,
     db,
     models::{
-        app_state::AppState,
         auth::Claims,
         error::ServerError,
         system_log::{CreateSyslogRequest, SyslogPageQuery},

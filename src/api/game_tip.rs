@@ -11,9 +11,9 @@ use tracing::{debug, warn};
 
 use crate::{
     api::validation::ValidatedJson,
+    app_state::AppState,
     db,
     models::{
-        app_state::AppState,
         auth::Claims,
         error::ServerError,
         game_tip::{CreateGameTipRequest, GameTipPageQuery},

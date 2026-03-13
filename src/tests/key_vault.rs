@@ -6,8 +6,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        models::{app_state::AppState, game_base::GameType},
-        service::key_vault::KeyVaultError,
+        app_state::AppState, models::game_base::GameType, service::key_vault::KeyVaultError,
     };
 
     async fn setup_app_state() -> Arc<AppState> {

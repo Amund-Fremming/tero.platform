@@ -8,6 +8,7 @@ use axum::{
 };
 
 use crate::{
+    app_state::AppState,
     db::{game_base::increment_times_played, imposter_game::get_imposter_game_by_id},
     models::game_base::{CreateStaticGameRequest, GamePagedRequest},
 };
@@ -31,7 +32,6 @@ use crate::{
         spin_game::{create_spin_game, get_spin_game_by_id},
     },
     models::{
-        app_state::AppState,
         auth::Claims,
         error::ServerError,
         game_base::{

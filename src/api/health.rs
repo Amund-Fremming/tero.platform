@@ -5,9 +5,9 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use crate::{
+    app_state::AppState,
     db,
     models::{
-        app_state::AppState,
         error::ServerError,
         system_log::{LogAction, LogCeverity},
     },

@@ -10,6 +10,7 @@ use axum::{
 
 use crate::{
     api::validation::ValidatedJson,
+    app_state::AppState,
     config::app_config::CONFIG,
     models::user::{ListUsersQuery, ResetPasswordRequest},
 };
@@ -28,7 +29,6 @@ use crate::{
         },
     },
     models::{
-        app_state::AppState,
         auth::Claims,
         error::ServerError,
         system_log::{LogAction, LogCeverity},

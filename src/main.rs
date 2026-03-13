@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use axum::{Router, middleware::from_fn_with_state, routing::post};
 use dotenvy::dotenv;
-use models::app_state::AppState;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -16,6 +15,7 @@ use crate::{
         user::{auth0_trigger_endpoint, protected_auth_routes, public_auth_routes},
         webhook_mw::webhook_mw,
     },
+    app_state::AppState,
     config::app_config::CONFIG,
     models::{
         error::ServerError,
@@ -24,6 +24,7 @@ use crate::{
 };
 
 mod api;
+mod app_state;
 mod config;
 mod db;
 mod models;
