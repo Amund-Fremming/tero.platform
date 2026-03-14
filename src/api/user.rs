@@ -15,7 +15,6 @@ use crate::{
     models::user::{ListUsersQuery, ResetPasswordRequest},
 };
 use serde_json::json;
-use sqlx::{Pool, Postgres};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -23,8 +22,8 @@ use crate::{
     db::{
         self,
         user::{
-            create_base_user, create_pseudo_user, delete_pseudo_user, get_base_user_by_id,
-            list_base_users, patch_base_user_by_id, pseudo_user_exists, tx_create_pseudo_user,
+            create_base_user, create_pseudo_user, get_base_user_by_id, link_pseudo_to_base_user,
+            list_base_users, patch_base_user_by_id, pseudo_user_exists,
             update_pseudo_user_activity,
         },
     },
@@ -34,7 +33,7 @@ use crate::{
         system_log::{LogAction, LogCeverity},
         user::{Auth0User, EnsureUserQuery, PatchUserRequest, Permission, SubjectId, UserRole},
     },
-    service::{popup_manager::ClientPopup, system_log_builder::SystemLogBuilder},
+    service::popup_manager::ClientPopup,
 };
 
 pub fn public_auth_routes(state: Arc<AppState>) -> Router {
@@ -50,7 +49,7 @@ pub fn protected_auth_routes(state: Arc<AppState>) -> Router {
         .route("/me", get(get_base_user_from_subject))
         .route("/activity-stats", get(get_user_activity_stats))
         .route("/popups", put(update_client_popup))
-        .route("/reset-password/{user_id}", post(reset_password))
+        .route("/reset-password", post(reset_password))
         .route("/{user_id}", patch(patch_user))
         .with_state(state)
 }
@@ -177,67 +176,28 @@ pub async fn auth0_trigger_endpoint(
         auth0_user.email.clone().unwrap_or("[no email]".to_string())
     );
 
-    let pseudo_id = Uuid::from_str(&pseudo_id).unwrap();
-
-    ensure_no_zombie_pseudo(state.get_pool(), pseudo_id, subject_id);
+    let pseudo_id = Uuid::from_str(&pseudo_id)
+        .map_err(|_| ServerError::Api(StatusCode::BAD_REQUEST, "Invalid pseudo_id".into()))?;
 
     let mut tx = state.get_pool().begin().await?;
-    let bid = create_base_user(&mut tx, &auth0_user).await?;
-    let pid = tx_create_pseudo_user(&mut tx, bid).await?;
-
-    if bid != pid {
-        return Err(ServerError::Internal("Failed to create user pair".into()));
-    }
-
+    let base_user_id = create_base_user(&mut tx, &auth0_user).await?;
     tx.commit().await?;
 
-    Ok((StatusCode::CREATED, Json(pid)))
-}
-
-fn ensure_no_zombie_pseudo(pool: &Pool<Postgres>, pseudo_id: Uuid, subject_id: SubjectId) {
-    let pool = pool.clone();
+    let pool = state.get_pool().clone();
     tokio::spawn(async move {
-        let pool = pool.clone();
-        let subject_id = subject_id.clone();
-
-        match get_base_user_by_id(&pool, pseudo_id).await {
-            Ok(option) if option.is_some() => {
-                debug!("Base user exists for pseudo user, skipping cleanup");
-                return;
-            }
-            Err(e) => {
-                error!(
-                    "Failed to fetch base user {} for pseudo user cleanup: {}",
-                    pseudo_id, e
-                );
-                _ = SystemLogBuilder::new(&pool)
-                    .action(LogAction::Read)
-                    .ceverity(LogCeverity::Warning)
-                    .function("cleanup_subject_pseudo_id")
-                    .description("Failed to verify base user existence during pseudo user cleanup")
-                    .subject(subject_id.clone())
-                    .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
-                    .log()
-                    .await;
-
-                return;
-            }
-            _ => {}
-        };
-
-        if let Err(e) = delete_pseudo_user(&pool, pseudo_id).await {
-            error!("Failed to delete zombie pseudo user {}: {}", pseudo_id, e);
-            _ = SystemLogBuilder::new(&pool)
-                .action(LogAction::Delete)
-                .ceverity(LogCeverity::Critical)
-                .function("cleanup_subject_pseudo_id")
-                .description("Failed to delete zombie pseudo user without corresponding base user")
-                .subject(subject_id)
-                .metadata(json!({"pseudo_user_id": pseudo_id, "error": e.to_string()}))
-                .log()
-                .await;
-        };
+        match link_pseudo_to_base_user(&pool, pseudo_id, base_user_id).await {
+            Ok(_) => info!(
+                "Linked pseudo user {} to base user {} on registration",
+                pseudo_id, base_user_id
+            ),
+            Err(e) => error!(
+                "Failed to link pseudo user {} to base user {}: {}",
+                pseudo_id, base_user_id, e
+            ),
+        }
     });
+
+    Ok((StatusCode::CREATED, Json(base_user_id)))
 }
 
 async fn list_all_users(
@@ -308,20 +268,13 @@ pub async fn get_client_popup(
 pub async fn reset_password(
     State(state): State<Arc<AppState>>,
     Extension(subject): Extension<SubjectId>,
-    Path(user_id): Path<Uuid>,
     ValidatedJson(request): ValidatedJson<ResetPasswordRequest>,
 ) -> Result<impl IntoResponse, ServerError> {
     match subject {
-        SubjectId::BaseUser(uid) => {
-            if uid != user_id {
-                warn!("User {} is doing side channel attack", uid);
-                return Err(ServerError::AccessDenied);
-            }
-        }
         SubjectId::Integration(intname) => {
             warn!(
                 "Integration {} tried resetting users {} password",
-                intname, user_id,
+                intname, request.email,
             );
             return Err(ServerError::AccessDenied);
         }
@@ -329,6 +282,7 @@ pub async fn reset_password(
             warn!("Psuedo users cannot reset passwords");
             return Err(ServerError::AccessDenied);
         }
+        _ => {}
     }
 
     let payload = json!({

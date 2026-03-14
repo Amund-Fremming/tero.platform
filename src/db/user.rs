@@ -18,6 +18,7 @@ use crate::{
     service::system_log_builder::SystemLogBuilder,
 };
 
+#[allow(dead_code)]
 pub async fn delete_pseudo_user(pool: &Pool<Postgres>, id: Uuid) -> Result<bool, sqlx::Error> {
     let row = sqlx::query!(
         r#"
@@ -48,22 +49,24 @@ pub async fn create_pseudo_user(pool: &Pool<Postgres>) -> Result<Uuid, sqlx::Err
     .await
 }
 
-pub async fn tx_create_pseudo_user(
-    tx: &mut Transaction<'_, Postgres>,
-    id: Uuid,
-) -> Result<Uuid, sqlx::Error> {
-    let last_active = Utc::now();
-    sqlx::query_scalar!(
+pub async fn link_pseudo_to_base_user(
+    pool: &Pool<Postgres>,
+    pseudo_id: Uuid,
+    base_user_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
         r#"
-        INSERT INTO "pseudo_user" (id, last_active)
-        VALUES ($1, $2)
-        RETURNING id
+        UPDATE "pseudo_user"
+        SET base_user_id = $1
+        WHERE id = $2
         "#,
-        id,
-        last_active
     )
-    .fetch_one(&mut **tx)
-    .await
+    .bind(base_user_id)
+    .bind(pseudo_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 /// NOTE: Only db function allowed to write system logs

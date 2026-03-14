@@ -64,7 +64,7 @@ impl SpinSession {
             current_iteration: 0,
             selection_size,
             rounds: vec![],
-            players: HashMap::from([(host_id, 0)]),
+            players: HashMap::new(),
         }
     }
 
@@ -84,7 +84,7 @@ impl SpinSession {
             current_iteration: 0,
             selection_size,
             rounds: game.rounds,
-            players: HashMap::from([(user_id, 0)]),
+            players: HashMap::new(),
         }
     }
 
@@ -104,7 +104,7 @@ impl SpinSession {
             current_iteration: 0,
             selection_size,
             rounds: game.rounds,
-            players: HashMap::from([(user_id, 0)]),
+            players: HashMap::new(),
         }
     }
 }

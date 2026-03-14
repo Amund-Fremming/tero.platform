@@ -6,6 +6,7 @@ ALTER TABLE IF EXISTS "saved_game" DROP CONSTRAINT IF EXISTS "fk_saved_game_base
 ALTER TABLE IF EXISTS "quiz_game" DROP CONSTRAINT IF EXISTS "fk_quiz_game_base";
 ALTER TABLE IF EXISTS "spin_game" DROP CONSTRAINT IF EXISTS "fk_spin_game_base";
 ALTER TABLE IF EXISTS "imposter_game" DROP CONSTRAINT IF EXISTS "fk_spin_game_base";
+ALTER TABLE IF EXISTS "pseudo_user" DROP CONSTRAINT IF EXISTS "fk_pseudo_user_base_user";
 
 -- Drop indexes
 DROP INDEX IF EXISTS "idx_random_game_id_game_type";
@@ -21,6 +22,7 @@ DROP INDEX IF EXISTS "idx_game_base_game_type";
 DROP INDEX IF EXISTS "idx_game_base_type_and_category";
 
 DROP INDEX IF EXISTS "idx_pseudo_user_id";
+DROP INDEX IF EXISTS "idx_pseudo_user_base_user_id";
 DROP INDEX IF EXISTS "idx_pseudo_user_last_active";
 
 DROP INDEX IF EXISTS "idx_base_user_id";

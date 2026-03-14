@@ -85,6 +85,7 @@ CREATE TABLE "suffix_word" (
 
 CREATE TABLE "pseudo_user" (
     "id" UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    "base_user_id" UUID,
     "last_active" TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -148,6 +149,7 @@ CREATE INDEX "idx_game_base_game_type" ON "game_base" ("game_type", "times_playe
 CREATE INDEX "idx_game_base_type_and_category" ON "game_base" ("game_type", "category", "times_played" DESC);
 
 CREATE INDEX "idx_pseudo_user_id" ON "pseudo_user" ("id");
+CREATE INDEX "idx_pseudo_user_base_user_id" ON "pseudo_user" ("base_user_id");
 CREATE INDEX "idx_pseudo_user_last_active" ON "pseudo_user" ("last_active");
 
 CREATE INDEX "idx_base_user_id" ON "base_user" ("id");
@@ -172,3 +174,7 @@ FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;
 ALTER TABLE "imposter_game"
 ADD CONSTRAINT "fk_imposter_game_base" 
 FOREIGN KEY ("id") REFERENCES "game_base"("id") ON DELETE CASCADE;
+
+ALTER TABLE "pseudo_user"
+ADD CONSTRAINT "fk_pseudo_user_base_user"
+FOREIGN KEY ("base_user_id") REFERENCES "base_user"("id") ON DELETE SET NULL;

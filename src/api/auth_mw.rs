@@ -37,11 +37,11 @@ pub async fn auth_mw(
     let token_header = extract_header(AUTHORIZATION.as_str(), req.headers());
 
     match (pseudo_header, token_header) {
-        (Some(pseudo_header), ..) => {
-            handle_pseudo_user(state.get_pool(), &mut req, &pseudo_header).await?;
-        }
-        (None, Some(token_header)) => {
+        (_, Some(token_header)) => {
             handle_token_header(state.clone(), &mut req, &token_header).await?;
+        }
+        (Some(pseudo_header), None) => {
+            handle_pseudo_user(state.get_pool(), &mut req, &pseudo_header).await?;
         }
         _ => {
             warn!("Unauthorized request - no valid authentication header provided");
