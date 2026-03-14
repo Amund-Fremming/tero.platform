@@ -1,15 +1,17 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
+use chrono::{Datelike, TimeZone, Utc};
+use chrono_tz::Europe::Oslo;
 use serde_json::json;
 
 use reqwest::Client;
 use sqlx::{Pool, Postgres};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
     api::gs_client::GSClient,
     config::app_config::CONFIG,
-    db::game_base::delete_non_active_games,
+    db::game_base::delete_stale_games,
     models::{
         auth::Jwks,
         error::ServerError,
@@ -93,23 +95,52 @@ impl AppState {
 
     pub fn spawn_game_cleanup(&self) {
         let pool = self.get_pool().clone();
-        let mut interval = tokio::time::interval(Duration::from_secs(86_400));
 
         tokio::spawn(async move {
             loop {
-                interval.tick().await;
-                if let Err(e) = delete_non_active_games(&pool).await {
-                    warn!("Failed to purge inactive games: {}", e);
-                    let _ = SystemLogBuilder::new(&pool)
-                        .action(LogAction::Delete)
-                        .ceverity(LogCeverity::Warning)
-                        .function("spawn_game_cleanup")
-                        .description("Failed to purge inactive games from database")
-                        .metadata(json!({"error": e.to_string()}))
-                        .log()
-                        .await;
+                let delay_secs = secs_until_0500_oslo();
+                tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+
+                let retention_days = CONFIG.server.active_game_retention;
+                match delete_stale_games(&pool, retention_days).await {
+                    Ok(n) => info!(
+                        "Game cleanup: purged {} stale game(s) (retention {}d)",
+                        n, retention_days
+                    ),
+                    Err(e) => {
+                        warn!("Game cleanup failed: {}", e);
+                        let _ = SystemLogBuilder::new(&pool)
+                            .action(LogAction::Delete)
+                            .ceverity(LogCeverity::Warning)
+                            .function("spawn_game_cleanup")
+                            .description("Failed to purge stale games from database")
+                            .metadata(json!({"error": e.to_string()}))
+                            .log()
+                            .await;
+                    }
                 }
             }
         });
     }
+}
+
+fn secs_until_0500_oslo() -> u64 {
+    let now_utc = Utc::now();
+    let now_oslo = now_utc.with_timezone(&Oslo);
+
+    let today_0500 = Oslo
+        .with_ymd_and_hms(now_oslo.year(), now_oslo.month(), now_oslo.day(), 5, 0, 0)
+        .earliest()
+        .expect("05:00 Oslo is always a valid time");
+
+    let next_run = if now_oslo < today_0500 {
+        today_0500
+    } else {
+        let tomorrow = now_oslo.date_naive().succ_opt().expect("date overflow");
+        Oslo.with_ymd_and_hms(tomorrow.year(), tomorrow.month(), tomorrow.day(), 5, 0, 0)
+            .earliest()
+            .expect("05:00 Oslo tomorrow is always a valid time")
+    };
+
+    next_run.signed_duration_since(now_utc).num_seconds().max(0) as u64
 }

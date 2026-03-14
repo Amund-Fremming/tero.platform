@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"game_base\" WHERE last_played < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81dfe6d5bf80c6cfe9875ee68efd65c1451f0201a0e5742f4616be9ef890ee36"
+}

@@ -60,8 +60,8 @@ fn default_runtime() -> Runtime {
     Runtime::Dev
 }
 
-fn default_active_game_retention() -> u8 {
-    24
+fn default_active_game_retention() -> u16 {
+    21
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ pub struct ServerConfig {
     #[serde(default = "default_page_size")]
     pub page_size: u16,
     #[serde(default = "default_active_game_retention")]
-    pub active_game_retention: u8,
+    pub active_game_retention: u16,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

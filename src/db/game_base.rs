@@ -66,19 +66,17 @@ where
     Ok(())
 }
 
-pub async fn delete_non_active_games(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
-    let timeout = Utc::now() - Duration::days(CONFIG.server.active_game_retention as i64);
-    sqlx::query!(
-        r#"
-        DELETE FROM "game_base"
-        WHERE last_played < $1
-        "#,
-        timeout
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
+pub async fn delete_stale_games(
+    pool: &Pool<Postgres>,
+    retention_days: u16,
+) -> Result<u64, sqlx::Error> {
+    let cutoff = Utc::now() - Duration::days(retention_days as i64);
+    let mut tx = pool.begin().await?;
+    let result = sqlx::query!(r#"DELETE FROM "game_base" WHERE last_played < $1"#, cutoff)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(result.rows_affected())
 }
 
 pub async fn get_game_page(
