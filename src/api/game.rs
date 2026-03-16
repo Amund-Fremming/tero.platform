@@ -471,6 +471,7 @@ async fn persist_interactive_game(
     Ok(StatusCode::CREATED)
 }
 
+/// Only called by `tero.session`.
 async fn free_game_key(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
