@@ -45,7 +45,6 @@ use crate::{
     },
 };
 
-// TODO - is this needed?
 async fn _get_random_name(client: &reqwest::Client) -> String {
     let mut rng = ChaCha8Rng::from_os_rng();
     let len = rng.random_range(4..=8);
