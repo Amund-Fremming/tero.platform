@@ -86,16 +86,19 @@ pub async fn get_game_page(
     let page_size = CONFIG.server.page_size;
     let limit = page_size + 1;
     let page_num = request.page_num.unwrap_or(0);
-    let game_type_str = request.game_type.unwrap_or(GameType::Quiz).as_str();
     let offset = page_size * page_num;
 
-    let category = match &request.category {
-        Some(category) => format!("AND category = '{}'", category),
-        None => "".to_string(),
-    };
+    let mut where_clause = Vec::new();
 
-    let query = format!(
-        r#"
+    if let Some(category) = request.category.clone() {
+        where_clause.push(format!("category = '{}'", category));
+    }
+
+    if let Some(game_type) = request.game_type {
+        where_clause.push(format!("game_type = '{}'", game_type.as_str()));
+    }
+
+    let mut query = r#"
         SELECT 
             id,
             name,
@@ -105,12 +108,21 @@ pub async fn get_game_page(
             times_played,
             last_played
         FROM "game_base"
-        WHERE game_type = '{}' {} 
+        "#
+    .to_string();
+
+    if !where_clause.is_empty() {
+        query.push_str(&format!("WHERE {}", where_clause.join(" AND ")));
+    }
+
+    query.push_str(&format!(
+        r#"
         ORDER BY times_played DESC
-        LIMIT {} OFFSET {}
-        "#,
-        game_type_str, category, limit, offset
-    );
+        LIMIT {}
+        OFFSET {}
+    "#,
+        limit, offset
+    ));
 
     let mut games = sqlx::query_as::<_, GameBase>(&query)
         .fetch_all(pool)
@@ -202,7 +214,7 @@ pub async fn get_saved_games_page(
             base.category,
             base.iterations,
             base.times_played,
-            base.last_played,
+            base.last_played
         FROM "game_base" base
         JOIN "saved_game" saved
         ON base.id = saved.base_id
