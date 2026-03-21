@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game_base::{GameConverter, RandomGame};
+use crate::models::game_base::GameConverter;
 
 impl GameConverter for ImposterSession {
     fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
@@ -46,22 +46,22 @@ impl ImposterSession {
         }
     }
 
-    pub fn from_game(user_id: Uuid, game: ImposterGame) -> Self {
+    pub fn from_game(host_id: Uuid, game: ImposterGame) -> Self {
         Self {
             game_id: game.id,
-            host_id: user_id,
+            host_id,
             current_iteration: 0,
             rounds: game.rounds,
             players: HashSet::new(),
         }
     }
 
-    pub fn from_random(user_id: Uuid, game: RandomGame) -> Self {
+    pub fn from_rounds(host_id: Uuid, game_id: Uuid, rounds: Vec<String>) -> Self {
         Self {
-            game_id: game.game_id,
-            host_id: user_id,
+            game_id,
+            host_id,
             current_iteration: 0,
-            rounds: game.rounds,
+            rounds,
             players: HashSet::new(),
         }
     }

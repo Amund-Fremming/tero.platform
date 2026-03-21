@@ -63,7 +63,7 @@ impl<T: Clone + Send + Sync + 'static> GustCache<T> {
         // Invalidate specific category and queries with no category filter
         let category = category.clone();
         match self.cache.invalidate_entries_if(move |key, _| {
-            key.game_type == game_type
+            key.game_type == Some(game_type)
                 && (key.category == Some(category.clone()) || key.category.is_none())
         }) {
             Ok(_) => Ok(()),
@@ -85,7 +85,7 @@ mod tests {
 
     fn make_key(game_type: GameType, category: Option<GameCategory>, page: u16) -> GameCacheKey {
         GameCacheKey {
-            game_type,
+            game_type: Some(game_type),
             category,
             page_num: page,
         }

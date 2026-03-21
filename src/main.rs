@@ -49,6 +49,7 @@ async fn main() {
 
     // Spawn cron jobs
     state.spawn_game_cleanup();
+    state.spawn_round_pool_job();
 
     // Initiate integrations
     if let Err(e) = load_integrations().await {

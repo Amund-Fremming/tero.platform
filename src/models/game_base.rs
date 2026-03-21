@@ -131,7 +131,7 @@ impl GameType {
 #[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Clone)]
 pub struct GameCacheKey {
     pub page_num: u16,
-    pub game_type: GameType,
+    pub game_type: Option<GameType>,
     pub category: Option<GameCategory>,
 }
 
@@ -139,7 +139,7 @@ impl GameCacheKey {
     pub fn from_request(query: &GamePagedRequest) -> Self {
         Self {
             page_num: query.page_num.unwrap_or(0),
-            game_type: query.game_type.unwrap_or(GameType::Quiz),
+            game_type: query.game_type,
             category: query.category.clone(),
         }
     }
@@ -165,13 +165,4 @@ pub struct InteractiveGameEnvelope {
 pub struct InitiateGameRequest {
     pub key: String,
     pub value: serde_json::Value,
-}
-
-#[allow(dead_code)] // TODO!
-#[derive(Debug, sqlx::FromRow)]
-pub struct RandomGame {
-    pub id: i64,
-    pub game_id: Uuid,
-    pub rounds: Vec<String>,
-    pub game_type: GameType,
 }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::game_base::{GameConverter, RandomGame};
+use crate::models::game_base::GameConverter;
 
 impl GameConverter for QuizSession {
     fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
@@ -48,11 +48,11 @@ impl QuizSession {
         }
     }
 
-    pub fn from_random(game: RandomGame) -> Self {
+    pub fn from_rounds(game_id: Uuid, rounds: Vec<String>) -> Self {
         Self {
-            game_id: game.game_id,
+            game_id,
             current_iteration: 0,
-            rounds: game.rounds,
+            rounds,
         }
     }
 }

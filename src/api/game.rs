@@ -9,7 +9,10 @@ use axum::{
 
 use crate::{
     app_state::AppState,
-    db::{game_base::increment_times_played, imposter_game::get_imposter_game_by_id},
+    db::{
+        game_base::{get_random_rounds, increment_times_played},
+        imposter_game::get_imposter_game_by_id,
+    },
     models::game_base::{CreateStaticGameRequest, GamePagedRequest},
 };
 use rand::{Rng, SeedableRng};
@@ -25,7 +28,6 @@ use crate::{
     db::{
         game_base::{
             create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
-            take_random_game,
         },
         imposter_game::create_imposter_game,
         quiz_game::{create_quiz_game, get_quiz_game_by_id},
@@ -310,22 +312,18 @@ async fn create_random_interactive_session(
     };
 
     let game_id = Uuid::new_v4();
-    let random_game = take_random_game(state.get_pool(), &game_type).await?;
-    // TODO - do i delete random created games, or let them be, then remove if they are later created?, or just never make it possible to persist random games?
+    let rounds = get_random_rounds(state.get_pool(), game_type, 20).await?;
 
     let value = match game_type {
-        GameType::Roulette => SpinSession::from_random_roulette(user_id, random_game).to_json()?,
-        GameType::Duel => SpinSession::from_random_duel(user_id, random_game).to_json()?,
-        GameType::Quiz => QuizSession::from_random(random_game).to_json()?,
-        GameType::Imposter => ImposterSession::from_random(user_id, random_game).to_json()?,
-    };
-
-    let gs_client = state.get_gs_client();
-    let pool = state.get_pool();
+        GameType::Duel => SpinSession::from_duel_rounds(user_id, game_id, rounds).to_json(),
+        GameType::Roulette => SpinSession::from_roulette_rounds(user_id, game_id, rounds).to_json(),
+        GameType::Imposter => ImposterSession::from_rounds(user_id, game_id, rounds).to_json(),
+        GameType::Quiz => QuizSession::from_rounds(game_id, rounds).to_json(),
+    }?;
 
     let key = state
         .get_vault()
-        .create_key(pool, game_type, false, game_id)?;
+        .create_key(state.get_pool(), game_type, false, game_id)?;
 
     let payload = InitiateGameRequest {
         key: key.clone(),
@@ -333,7 +331,8 @@ async fn create_random_interactive_session(
     };
     debug!("Created key: {}", key);
 
-    gs_client
+    state
+        .get_gs_client()
         .initiate_game_session(&game_type, &payload)
         .await?;
 

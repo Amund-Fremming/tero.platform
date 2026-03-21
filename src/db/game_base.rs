@@ -1,7 +1,6 @@
 use chrono::{Duration, Utc};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
-use sqlx::{Executor, Pool, Postgres};
+use serde::{Serialize, de::DeserializeOwned};
+use sqlx::{Executor, Pool, Postgres, QueryBuilder, types::Json};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -9,7 +8,7 @@ use crate::{
     config::app_config::CONFIG,
     models::{
         error::ServerError,
-        game_base::{GameBase, GamePagedRequest, GameType, PagedResponse, RandomGame},
+        game_base::{GameBase, GamePagedRequest, GameType, PagedResponse},
     },
 };
 
@@ -203,7 +202,11 @@ pub async fn get_saved_games_page(
     let limit = page_size + 1;
     let page_num = request.page_num.unwrap_or(0);
     let offset = page_num * page_size;
-    let game_type = request.game_type.unwrap_or(GameType::Quiz);
+
+    let game_type = match request.game_type {
+        Some(game_type) => format!(" AND base.game_type = '{}'", game_type.as_str()),
+        None => String::new(),
+    };
 
     let query = format!(
         r#"
@@ -218,10 +221,10 @@ pub async fn get_saved_games_page(
         FROM "game_base" base
         JOIN "saved_game" saved
         ON base.id = saved.base_id
-        WHERE saved.user_id = $1 AND base.game_type = $2
+        WHERE saved.user_id = $1 {}
         LIMIT {} OFFSET {}
         "#,
-        limit, offset
+        game_type, limit, offset
     );
 
     let mut games = sqlx::query_as::<_, GameBase>(&query)
@@ -244,25 +247,191 @@ pub async fn get_saved_games_page(
     Ok(page)
 }
 
-pub async fn take_random_game(
+pub async fn get_random_rounds<T>(
     pool: &Pool<Postgres>,
-    game_type: &GameType,
-) -> Result<RandomGame, sqlx::Error> {
-    let mut rng = ChaCha8Rng::from_os_rng();
-    let random_id = rng.random_range(4..=7);
-
-    // TODO! get biggest id by getting last inserted, then get 5-10 random ids, just so i get one with one db trip, if not found, try again
-
-    sqlx::query_as!(
-        RandomGame,
+    game_type: GameType,
+    num_rounds: i64,
+) -> Result<Vec<T>, ServerError>
+where
+    T: DeserializeOwned + Send + Unpin + 'static,
+{
+    let rows: Vec<Json<T>> = sqlx::query_scalar(
         r#"
-        DELETE FROM "random_game"
-        WHERE id = $1 AND game_type = $2
-        RETURNING id, game_id, rounds, game_type AS "game_type: GameType" 
-    "#,
-        random_id,
-        game_type as _
+        SELECT round_json 
+        FROM round_pool TABLESAMPLE SYSTEM (5) -- Grab a random 5% of the table
+        WHERE game_type = $1
+        LIMIT $2
+        "#,
     )
-    .fetch_one(pool)
-    .await
+    .bind(game_type as GameType)
+    .bind(num_rounds)
+    .fetch_all(pool)
+    .await?;
+    let rounds: Vec<T> = rows.into_iter().map(|j| j.0).collect();
+
+    if (rounds.len() as i64) < num_rounds {
+        let error = format!(
+            "Not enough random rounds for {} to get {} random rounds",
+            game_type.as_str(),
+            num_rounds
+        );
+        warn!(error);
+        return Err(ServerError::Internal(error));
+    }
+
+    Ok(rounds)
+}
+
+pub async fn fill_rounds_pool<T>(
+    pool: &Pool<Postgres>,
+    game_type: GameType,
+    rounds: Vec<T>,
+) -> Result<(), sqlx::Error>
+where
+    T: Serialize,
+{
+    if rounds.is_empty() {
+        return Ok(());
+    }
+
+    let mut query_builder =
+        QueryBuilder::<Postgres>::new(r#"INSERT INTO "round_pool" (game_type, round_json) "#);
+
+    query_builder.push_values(rounds, |mut row, round| {
+        row.push_bind(game_type).push_bind(Json(round));
+    });
+
+    query_builder.build().execute(pool).await?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use dotenvy::dotenv;
+    use serde::{Deserialize, Serialize};
+    use sqlx::{Pool, Postgres, types::Json};
+
+    use crate::models::game_base::GameType;
+
+    use super::get_random_rounds;
+
+    async fn setup_pool() -> Pool<Postgres> {
+        dotenv().ok();
+        let url = env::var("TERO__DATABASE_URL").expect("TERO__DATABASE_URL not set");
+        sqlx::postgres::PgPoolOptions::new()
+            .connect(&url)
+            .await
+            .unwrap()
+    }
+
+    async fn seed<T: Serialize>(pool: &Pool<Postgres>, game_type: GameType, items: &[T]) {
+        for item in items {
+            sqlx::query(r#"INSERT INTO "round_pool" (game_type, round_json) VALUES ($1, $2)"#)
+                .bind(game_type)
+                .bind(Json(item))
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn cleanup(pool: &Pool<Postgres>, game_type: GameType) {
+        sqlx::query(r#"DELETE FROM "round_pool" WHERE game_type = $1"#)
+            .bind(game_type)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct TestRound {
+        value: i32,
+        label: String,
+    }
+
+    #[tokio::test]
+    async fn random_rounds_string() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
+        let pool = setup_pool().await;
+        let game_type = GameType::Quiz;
+        cleanup(&pool, game_type).await;
+
+        let items: Vec<String> = (0..6).map(|i| format!("round_{i}")).collect();
+        seed(&pool, game_type, &items).await;
+
+        let mut seen: std::collections::HashSet<String> = Default::default();
+        for _ in 0..10 {
+            let rounds: Vec<String> = get_random_rounds(&pool, game_type, 2).await.unwrap();
+            assert_eq!(rounds.len(), 2);
+            seen.extend(rounds);
+        }
+        assert!(
+            seen.len() > 2,
+            "Expected variety across fetches, got: {seen:?}"
+        );
+
+        cleanup(&pool, game_type).await;
+    }
+
+    #[tokio::test]
+    async fn random_rounds_int() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
+        let pool = setup_pool().await;
+        let game_type = GameType::Duel;
+        cleanup(&pool, game_type).await;
+
+        let items: Vec<i32> = (100..106).collect();
+        seed(&pool, game_type, &items).await;
+
+        let mut seen: std::collections::HashSet<i32> = Default::default();
+        for _ in 0..10 {
+            let rounds: Vec<i32> = get_random_rounds(&pool, game_type, 2).await.unwrap();
+            assert_eq!(rounds.len(), 2);
+            seen.extend(rounds);
+        }
+        assert!(
+            seen.len() > 2,
+            "Expected variety across fetches, got: {seen:?}"
+        );
+
+        cleanup(&pool, game_type).await;
+    }
+
+    #[tokio::test]
+    async fn random_rounds_struct() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
+        let pool = setup_pool().await;
+        let game_type = GameType::Roulette;
+        cleanup(&pool, game_type).await;
+
+        let items: Vec<TestRound> = (0..6)
+            .map(|i| TestRound {
+                value: i,
+                label: format!("label_{i}"),
+            })
+            .collect();
+        seed(&pool, game_type, &items).await;
+
+        let mut seen: std::collections::HashSet<i32> = Default::default();
+        for _ in 0..10 {
+            let rounds: Vec<TestRound> = get_random_rounds(&pool, game_type, 2).await.unwrap();
+            assert_eq!(rounds.len(), 2);
+            seen.extend(rounds.iter().map(|r| r.value));
+        }
+        assert!(
+            seen.len() > 2,
+            "Expected variety across fetches, got: {seen:?}"
+        );
+
+        cleanup(&pool, game_type).await;
+    }
 }

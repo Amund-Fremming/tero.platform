@@ -5,6 +5,25 @@ on: [push, pull_request]
 jobs:
   build-test-deploy:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tero_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tero_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ENVIRONMENT: dev
+      TERO__DATABASE_URL: postgres://postgres:postgres@localhost:5432/tero_ci
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/tero_ci
 
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +33,14 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run migrations
+        run: |
+          psql "$DATABASE_URL" -f migrations/0001_schema.up.sql
+          psql "$DATABASE_URL" -f migrations/0002_data.up.sql
 
       - name: Install cargo crates
         run: cargo install cargo-audit cargo-deny
