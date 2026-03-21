@@ -257,9 +257,13 @@ where
 {
     let rows: Vec<Json<T>> = sqlx::query_scalar(
         r#"
-        SELECT round_json 
-        FROM round_pool TABLESAMPLE SYSTEM (5) -- Grab a random 5% of the table
+        WITH threshold AS (
+            SELECT random() AS cutoff
+        )
+        SELECT round_json
+        FROM round_pool, threshold
         WHERE game_type = $1
+        ORDER BY (random_key < threshold.cutoff), random_key
         LIMIT $2
         "#,
     )
@@ -267,12 +271,13 @@ where
     .bind(num_rounds)
     .fetch_all(pool)
     .await?;
-    let rounds: Vec<T> = rows.into_iter().map(|j| j.0).collect();
+    let rounds: Vec<T> = rows.into_iter().map(|json| json.0).collect();
 
     if (rounds.len() as i64) < num_rounds {
         let error = format!(
-            "Not enough random rounds for {} to get {} random rounds",
+            "Not enough random rounds for {}, got {}/{} rounds",
             game_type.as_str(),
+            rounds.len(),
             num_rounds
         );
         warn!(error);
@@ -301,6 +306,8 @@ where
         row.push_bind(game_type).push_bind(Json(round));
     });
 
+    query_builder.push(r#" ON CONFLICT (game_type, round_json) DO NOTHING"#);
+
     query_builder.build().execute(pool).await?;
 
     Ok(())
@@ -316,7 +323,7 @@ mod tests {
 
     use crate::models::game_base::GameType;
 
-    use super::get_random_rounds;
+    use super::{fill_rounds_pool, get_random_rounds};
 
     async fn setup_pool() -> Pool<Postgres> {
         dotenv().ok();
@@ -431,6 +438,39 @@ mod tests {
             seen.len() > 2,
             "Expected variety across fetches, got: {seen:?}"
         );
+
+        cleanup(&pool, game_type).await;
+    }
+
+    #[tokio::test]
+    async fn fill_rounds_pool_skips_duplicates() {
+        if env::var("ENVIRONMENT").unwrap_or_default() != "dev" {
+            return;
+        }
+
+        let pool = setup_pool().await;
+        let game_type = GameType::Quiz;
+        cleanup(&pool, game_type).await;
+
+        let items = vec![
+            String::from("round_a"),
+            String::from("round_b"),
+            String::from("round_a"),
+        ];
+
+        fill_rounds_pool(&pool, game_type, items.clone())
+            .await
+            .unwrap();
+        fill_rounds_pool(&pool, game_type, items).await.unwrap();
+
+        let count: i64 =
+            sqlx::query_scalar(r#"SELECT COUNT(*) FROM "round_pool" WHERE game_type = $1"#)
+                .bind(game_type)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+
+        assert_eq!(count, 2);
 
         cleanup(&pool, game_type).await;
     }

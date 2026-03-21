@@ -137,7 +137,7 @@ impl AppState {
         });
     }
 
-    pub async fn _fill_rounds_pool(&self, game_id: Uuid, game_type: GameType) {
+    pub async fn fill_rounds_pool(&self, game_id: Uuid, game_type: GameType) {
         let lock = self.round_pool_sender.lock().await;
         let Some(sender) = lock.as_ref() else {
             return;
@@ -171,24 +171,61 @@ impl AppState {
 
         tokio::spawn(async move {
             loop {
-                if let Err(e) = Self::init_channels(&pool, sender.clone()).await {
-                    error!("Round pool bg job failed: {}", e);
-                    info!("Restarting round pool bg job");
+                let worker_pool = pool.clone();
+                let worker_sender = sender.clone();
 
-                    if let Err(e) = SystemLogBuilder::new(&pool)
-                        .action(LogAction::Other)
-                        .ceverity(LogCeverity::Warning)
-                        .function("spawn_round_pool_job")
-                        .description("Round pool worker failed and is being restarted")
-                        .metadata(json!({"error": e.to_string()}))
-                        .log()
-                        .await
-                    {
-                        error!("Round pool job failed to create audit log: {}", e);
-                    };
+                let worker = tokio::spawn(async move {
+                    Self::run_round_pool_supervisor(&worker_pool, worker_sender).await;
+                });
+
+                match worker.await {
+                    Ok(()) => {
+                        warn!("Round pool supervisor task exited; restarting");
+                        SystemLogBuilder::new(&pool)
+                            .action(LogAction::Other)
+                            .ceverity(LogCeverity::Info)
+                            .function("spawn_round_pool_job")
+                            .description("Round pool supervisor task exited and is being restarted")
+                            .log_async();
+                    }
+                    Err(e) => {
+                        error!("Round pool supervisor task panicked: {}", e);
+                        SystemLogBuilder::new(&pool)
+                            .action(LogAction::Other)
+                            .ceverity(LogCeverity::Warning)
+                            .function("spawn_round_pool_job")
+                            .description(
+                                "Round pool supervisor task panicked and is being restarted",
+                            )
+                            .metadata(json!({"error": e.to_string(), "panic": e.is_panic()}))
+                            .log_async();
+                    }
                 }
+
+                info!("Restarting round pool supervisor task");
             }
         });
+    }
+
+    async fn run_round_pool_supervisor(pool: &Pool<Postgres>, sender: RoundPoolSender) {
+        loop {
+            if let Err(e) = Self::init_channels(pool, sender.clone()).await {
+                error!("Round pool bg job failed: {}", e);
+                info!("Restarting round pool bg job");
+
+                if let Err(e) = SystemLogBuilder::new(pool)
+                    .action(LogAction::Other)
+                    .ceverity(LogCeverity::Warning)
+                    .function("run_round_pool_supervisor")
+                    .description("Round pool worker failed and is being restarted")
+                    .metadata(json!({"error": e.to_string()}))
+                    .log()
+                    .await
+                {
+                    error!("Round pool job failed to create audit log: {}", e);
+                };
+            }
+        }
     }
 
     async fn init_channels(

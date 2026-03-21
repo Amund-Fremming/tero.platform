@@ -20,7 +20,7 @@ use rand_chacha::ChaCha8Rng;
 use reqwest::StatusCode;
 use uuid::Uuid;
 
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
@@ -95,9 +95,10 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     let static_routes = Router::new()
+        .route("/{game_type}/initiate/{game_id}", get(initiate_static_game))
         .route(
-            "/{game_type}/initiate/{game_id}",
-            get(initiate_standalone_game),
+            "/{game_type}/initiate-random",
+            get(initiate_random_static_game),
         )
         .route("/persist/{game_type}", post(persist_static_game))
         .with_state(state.clone());
@@ -205,7 +206,7 @@ async fn create_game_session(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-async fn initiate_standalone_game(
+async fn initiate_static_game(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path((game_type, game_id)): Path<(GameType, Uuid)>,
@@ -238,6 +239,40 @@ async fn initiate_standalone_game(
     };
 
     increment_times_played(state.get_pool(), game_id).await?;
+
+    Ok((StatusCode::OK, Json(wrapper)))
+}
+
+async fn initiate_random_static_game(
+    State(state): State<Arc<AppState>>,
+    Extension(subject_id): Extension<SubjectId>,
+    Path(game_type): Path<GameType>,
+) -> Result<impl IntoResponse, ServerError> {
+    let user_id = match subject_id {
+        SubjectId::BaseUser(id) | SubjectId::PseudoUser(id) => id,
+        _ => {
+            warn!("Integration tried accessing user endpoint");
+            return Err(ServerError::AccessDenied);
+        }
+    };
+
+    let game_id = Uuid::new_v4();
+    let wrapper = match game_type {
+        GameType::Quiz => {
+            let rounds = get_random_rounds(state.get_pool(), game_type, 20).await?;
+            ResponseWrapper::Quiz(QuizSession::from_rounds(game_id, rounds))
+        }
+        GameType::Imposter => {
+            let rounds = get_random_rounds(state.get_pool(), game_type, 20).await?;
+            ResponseWrapper::Imposter(ImposterSession::from_rounds(user_id, game_id, rounds))
+        }
+        _ => {
+            return Err(ServerError::Api(
+                StatusCode::BAD_REQUEST,
+                "This game does not have static support".into(),
+            ));
+        }
+    };
 
     Ok((StatusCode::OK, Json(wrapper)))
 }
@@ -318,7 +353,16 @@ async fn create_random_interactive_session(
         GameType::Duel => SpinSession::from_duel_rounds(user_id, game_id, rounds).to_json(),
         GameType::Roulette => SpinSession::from_roulette_rounds(user_id, game_id, rounds).to_json(),
         GameType::Imposter => ImposterSession::from_rounds(user_id, game_id, rounds).to_json(),
-        GameType::Quiz => QuizSession::from_rounds(game_id, rounds).to_json(),
+        _ => {
+            error!(
+                "Create random interactive game not supported for game type {}",
+                game_type.as_str()
+            );
+            return Err(ServerError::Api(
+                StatusCode::BAD_REQUEST,
+                "Game type not supported".to_string(),
+            ));
+        }
     }?;
 
     let key = state
@@ -408,6 +452,7 @@ pub async fn persist_static_game(
     };
     tx.commit().await?;
 
+    state.fill_rounds_pool(game_base.id, game_type).await;
     state
         .get_cache()
         .invalidate(game_type, &payload.category)
@@ -436,7 +481,7 @@ async fn persist_interactive_game(
 
     let mut tx = state.get_pool().begin().await?;
 
-    match game_type {
+    let game_id = match game_type {
         GameType::Roulette | GameType::Duel => {
             let session: SpinSession = serde_json::from_value(payload.payload)?;
             let game_base = GameBase::new(
@@ -448,7 +493,7 @@ async fn persist_interactive_game(
             );
             create_game_base(tx.as_mut(), &game_base).await?;
             create_spin_game(tx.as_mut(), &session.into()).await?;
-            game_base
+            game_base.id
         }
         _ => {
             return Err(ServerError::Api(
@@ -457,9 +502,9 @@ async fn persist_interactive_game(
             ));
         }
     };
-
     tx.commit().await?;
 
+    state.fill_rounds_pool(game_id, game_type).await;
     state
         .get_cache()
         .invalidate(game_type, &payload.category)

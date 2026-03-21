@@ -131,10 +131,13 @@ CREATE TABLE "imposter_game" (
 CREATE TABLE "round_pool" (
     "id" BIGSERIAL PRIMARY KEY,
     "game_type" game_type NOT NULL,
+    "random_key" DOUBLE PRECISION NOT NULL DEFAULT random(),
     "round_json" JSONB NOT NULL
 );
 
 CREATE INDEX "idx_round_pool_game_type" ON "round_pool" ("game_type");
+CREATE INDEX "idx_round_pool_game_type_random_key" ON "round_pool" ("game_type", "random_key");
+CREATE UNIQUE INDEX "idx_round_pool_game_type_round_json_unique" ON "round_pool" ("game_type", "round_json");
 
 CREATE INDEX "idx_saved_game_id" ON "saved_game" ("id");
 CREATE INDEX "idx_saved_game_delete_keys" ON "saved_game" ("id", "user_id");

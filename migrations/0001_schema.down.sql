@@ -9,6 +9,8 @@ ALTER TABLE IF EXISTS "imposter_game" DROP CONSTRAINT IF EXISTS "fk_spin_game_ba
 ALTER TABLE IF EXISTS "pseudo_user" DROP CONSTRAINT IF EXISTS "fk_pseudo_user_base_user";
 
 -- Drop indexes
+DROP INDEX IF EXISTS "idx_round_pool_game_type_round_json_unique";
+DROP INDEX IF EXISTS "idx_round_pool_game_type_random_key";
 DROP INDEX IF EXISTS "idx_round_pool_game_type";
 
 DROP INDEX IF EXISTS "idx_saved_game_id";
