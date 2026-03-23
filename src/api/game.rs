@@ -24,7 +24,6 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     api::gs_client::{InteractiveGameResponse, JoinGameResponse},
-    config::app_config::CONFIG,
     db::{
         game_base::{
             create_game_base, delete_saved_game, get_game_page, get_saved_games_page, save_game,
@@ -111,7 +110,7 @@ pub fn game_routes(state: Arc<AppState>) -> Router {
         )
         .route(
             "/{game_type}/initiate-random",
-            post(create_random_interactive_session),
+            post(initiate_random_interactive_session),
         )
         .route("/join/{game_id}", post(join_interactive_game))
         .route("/{game_type}/create", post(create_game_session))
@@ -336,7 +335,7 @@ async fn initiate_interactive_game(
     Ok((StatusCode::OK, Json(response)))
 }
 
-async fn create_random_interactive_session(
+async fn initiate_random_interactive_session(
     State(state): State<Arc<AppState>>,
     Extension(subject_id): Extension<SubjectId>,
     Path(game_type): Path<GameType>,
@@ -380,11 +379,10 @@ async fn create_random_interactive_session(
         .initiate_game_session(&game_type, &payload)
         .await?;
 
-    let hub_address = format!("{}/hubs/{}", CONFIG.server.gs_domain, game_type.hub_name());
     let response = InteractiveGameResponse {
         key,
         game_id,
-        hub_name: hub_address,
+        hub_name: game_type.hub_name().to_string(),
         is_draft: false,
     };
 
