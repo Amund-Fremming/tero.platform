@@ -11,9 +11,13 @@ use crate::{
     app_state::AppState,
     db::{
         game_base::{get_random_rounds, increment_times_played},
+        guess_game::create_guess_game,
         imposter_game::get_imposter_game_by_id,
     },
-    models::game_base::{CreateStaticGameRequest, GamePagedRequest},
+    models::{
+        game_base::{CreateStaticGameRequest, GamePagedRequest},
+        guess_game::GuessSession,
+    },
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -36,8 +40,8 @@ use crate::{
         auth::Claims,
         error::ServerError,
         game_base::{
-            GameBase, GameCacheKey, GameConverter, GameType, InitiateGameRequest,
-            InteractiveGameEnvelope, ResponseWrapper,
+            GameBase, GameCacheKey, GameType, InitiateGameRequest, InteractiveGameEnvelope,
+            JsonConverter, ResponseWrapper,
         },
         imposter_game::ImposterSession,
         quiz_game::QuizSession,
@@ -178,6 +182,7 @@ async fn create_game_session(
         GameType::Duel => SpinSession::new_duel(user_id, game_id).to_json()?,
         GameType::Quiz => QuizSession::new(game_id).to_json()?,
         GameType::Imposter => ImposterSession::new(user_id, game_id).to_json()?,
+        GameType::Guess => GuessSession::new(user_id, game_id).to_json()?,
     };
 
     let key = state
@@ -352,6 +357,7 @@ async fn initiate_random_interactive_session(
         GameType::Duel => SpinSession::from_duel_rounds(user_id, game_id, rounds).to_json(),
         GameType::Roulette => SpinSession::from_roulette_rounds(user_id, game_id, rounds).to_json(),
         GameType::Imposter => ImposterSession::from_rounds(user_id, game_id, rounds).to_json(),
+        GameType::Guess => GuessSession::from_rounds(user_id, game_id, rounds).to_json(),
         _ => {
             error!(
                 "Create random interactive game not supported for game type {}",
@@ -491,6 +497,19 @@ async fn persist_interactive_game(
             );
             create_game_base(tx.as_mut(), &game_base).await?;
             create_spin_game(tx.as_mut(), &session.into()).await?;
+            game_base.id
+        }
+        GameType::Guess => {
+            let session: GuessSession = serde_json::from_value(payload.payload)?;
+            let game_base = GameBase::new(
+                session.game_id,
+                payload.name,
+                game_type,
+                payload.category.clone(),
+                session.rounds.len() as i32,
+            );
+            create_game_base(tx.as_mut(), &game_base).await?;
+            create_guess_game(tx.as_mut(), &session.into()).await?;
             game_base.id
         }
         _ => {

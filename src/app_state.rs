@@ -15,6 +15,7 @@ use crate::{
     config::app_config::CONFIG,
     db::{
         game_base::{delete_stale_games, fill_rounds_pool},
+        guess_game::get_guess_game_by_id,
         imposter_game::get_imposter_game_by_id,
         quiz_game::get_quiz_game_by_id,
         spin_game::get_spin_game_by_id,
@@ -36,7 +37,7 @@ type RoundPoolSender = Arc<Mutex<Option<mpsc::UnboundedSender<(Uuid, GameType)>>
 #[derive(Clone)]
 pub struct AppState {
     pool: Pool<Postgres>,
-    jwks: Jwks,
+    jwks: Option<Jwks>,
     client: Client,
     gs_client: GSClient,
     page_cache: Arc<GustCache<PagedResponse<GameBase>>>,
@@ -53,9 +54,14 @@ impl AppState {
         let client = Client::new();
         let gs_client = GSClient::new(&CONFIG.server.gs_domain, client.clone());
 
-        let jwks_url = format!("{}.well-known/jwks.json", CONFIG.auth0.domain);
-        let response = client.get(jwks_url).send().await?;
-        let jwks = response.json::<Jwks>().await?;
+        let jwks = if CONFIG.offline_mode {
+            let jwks_url = format!("{}.well-known/jwks.json", CONFIG.auth0.domain);
+            let response = client.get(jwks_url).send().await?;
+            let jwks = response.json::<Jwks>().await?;
+            Some(jwks)
+        } else {
+            None
+        };
         let page_cache = Arc::new(GustCache::from_ttl(120));
         let key_vault = Arc::new(KeyVault::load_words(&pool).await?);
         let popup_manager = PopupManager::new();
@@ -79,7 +85,7 @@ impl AppState {
         &self.pool
     }
 
-    pub fn get_jwks(&self) -> &Jwks {
+    pub fn get_jwks(&self) -> &Option<Jwks> {
         &self.jwks
     }
 
@@ -281,6 +287,20 @@ impl AppState {
                         Ok(game) => game,
                         Err(e) => {
                             error!("Round pool bg job failed to get imposter game: {}", e);
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds).await {
+                        error!("Round pool bg job failed to fill rounds: {}", e);
+                        continue;
+                    }
+                }
+                GameType::Guess => {
+                    let game = match get_guess_game_by_id(pool, game_id).await {
+                        Ok(game) => game,
+                        Err(e) => {
+                            error!("Round pool bg job failed to get guess game: {}", e);
                             continue;
                         }
                     };

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"guess_game\" (id, rounds)\n        VALUES ($1, $2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b427c0fe658c93238a27a6102f009eb142c66a9d55b7a7b9f9ddf85c29257960"
+}

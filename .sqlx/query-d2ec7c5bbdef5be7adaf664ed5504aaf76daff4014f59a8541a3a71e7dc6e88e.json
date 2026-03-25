@@ -15,7 +15,8 @@
                 "roulette",
                 "duel",
                 "quiz",
-                "imposter"
+                "imposter",
+                "guess"
               ]
             }
           }

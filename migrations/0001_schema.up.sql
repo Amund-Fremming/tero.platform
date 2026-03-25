@@ -5,7 +5,8 @@ CREATE TYPE "game_type" AS ENUM (
     'roulette',
     'duel',
     'quiz',
-    'imposter'
+    'imposter',
+    'guess'
 );
 
 CREATE TYPE "integration_name" AS ENUM (
@@ -124,6 +125,11 @@ CREATE TABLE "spin_game" (
 );
 
 CREATE TABLE "imposter_game" (
+    "id" UUID PRIMARY KEY,
+    "rounds" TEXT[] NOT NULL
+);
+
+CREATE TABLE "guess_game" (
     "id" UUID PRIMARY KEY,
     "rounds" TEXT[] NOT NULL
 );

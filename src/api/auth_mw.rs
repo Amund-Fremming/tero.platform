@@ -10,7 +10,7 @@ use axum::{
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode, decode_header};
 use serde_json::json;
 use sqlx::{Pool, Postgres};
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     app_state::AppState,
@@ -81,7 +81,12 @@ async fn handle_token_header(
         ));
     };
 
-    let token_data = verify_jwt(token, state.get_jwks()).await?;
+    let Some(jwks) = state.get_jwks() else {
+        debug!("🚨 Ofline mode set, skipping auth middleware validation");
+        return Ok(());
+    };
+
+    let token_data = verify_jwt(token, jwks).await?;
     let claims: Claims = serde_json::from_value(token_data.claims)?;
 
     let subject = match claims.is_machine() {
