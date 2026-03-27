@@ -38,8 +38,6 @@ impl From<String> for Runtime {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
-    #[serde(default)]
-    pub offline_mode: bool,
     pub server: ServerConfig,
     pub auth0: Auth0Config,
     pub database_url: String,

@@ -37,7 +37,7 @@ type RoundPoolSender = Arc<Mutex<Option<mpsc::UnboundedSender<(Uuid, GameType)>>
 #[derive(Clone)]
 pub struct AppState {
     pool: Pool<Postgres>,
-    jwks: Option<Jwks>,
+    jwks: Jwks,
     client: Client,
     gs_client: GSClient,
     page_cache: Arc<GustCache<PagedResponse<GameBase>>>,
@@ -54,14 +54,9 @@ impl AppState {
         let client = Client::new();
         let gs_client = GSClient::new(&CONFIG.server.gs_domain, client.clone());
 
-        let jwks = if CONFIG.offline_mode {
-            let jwks_url = format!("{}.well-known/jwks.json", CONFIG.auth0.domain);
-            let response = client.get(jwks_url).send().await?;
-            let jwks = response.json::<Jwks>().await?;
-            Some(jwks)
-        } else {
-            None
-        };
+        let jwks_url = format!("{}.well-known/jwks.json", CONFIG.auth0.domain);
+        let response = client.get(jwks_url).send().await?;
+        let jwks = response.json::<Jwks>().await?;
         let page_cache = Arc::new(GustCache::from_ttl(120));
         let key_vault = Arc::new(KeyVault::load_words(&pool).await?);
         let popup_manager = PopupManager::new();
@@ -85,7 +80,7 @@ impl AppState {
         &self.pool
     }
 
-    pub fn get_jwks(&self) -> &Option<Jwks> {
+    pub fn get_jwks(&self) -> &Jwks {
         &self.jwks
     }
 
