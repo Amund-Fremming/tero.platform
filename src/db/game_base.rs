@@ -468,7 +468,7 @@ mod tests {
         }
 
         let pool = setup_pool().await;
-        let game_type = GameType::Quiz;
+        let game_type = GameType::Imposter;
         cleanup(&pool, game_type).await;
 
         let items = vec![
