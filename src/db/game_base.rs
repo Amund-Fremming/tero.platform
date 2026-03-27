@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::{Duration, Utc};
 use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{Executor, Pool, Postgres, QueryBuilder, types::Json};
@@ -299,10 +301,27 @@ where
         return Ok(());
     }
 
+    let mut seen = HashSet::new();
+    let unique_rounds: Vec<serde_json::Value> = rounds
+        .into_iter()
+        .filter_map(|r| {
+            let v = serde_json::to_value(r).ok()?;
+            if seen.insert(v.to_string()) {
+                Some(v)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if unique_rounds.is_empty() {
+        return Ok(());
+    }
+
     let mut query_builder =
         QueryBuilder::<Postgres>::new(r#"INSERT INTO "round_pool" (game_type, round_json) "#);
 
-    query_builder.push_values(rounds, |mut row, round| {
+    query_builder.push_values(unique_rounds, |mut row, round| {
         row.push_bind(game_type).push_bind(Json(round));
     });
 

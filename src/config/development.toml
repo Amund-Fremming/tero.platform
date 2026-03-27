@@ -9,6 +9,8 @@ page_size = 5
 [auth0]
 domain = "https://dev-tero.eu.auth0.com/"
 audience = "https://api.tero.com"
+client_id = "placeholder"
+webhook_key = "placeholder"
 
 [[integrations]]
 subject = "NmMLjTtX0XrnWjbe1JbRAgwEmn5lP3Sg"
