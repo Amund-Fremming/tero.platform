@@ -17,10 +17,7 @@ pub async fn webhook_mw(mut req: Request<Body>, next: Next) -> Result<Response, 
 
     let valid_key = CONFIG.auth0.webhook_key.to_string();
     if valid_key != webhook_header {
-        warn!(
-            "Valid key: {} \nReceived webhook key: {} ",
-            valid_key, webhook_header
-        );
+        warn!("Received request with invalid webhook key");
         return Err(ServerError::Api(
             StatusCode::UNAUTHORIZED,
             "Invalid webhook key".into(),

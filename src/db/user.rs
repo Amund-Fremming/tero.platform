@@ -86,23 +86,23 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
 
     match result {
         Err(e) => {
-            _ = SystemLogBuilder::new(pool)
+            SystemLogBuilder::new(pool)
                 .action(LogAction::Create)
                 .ceverity(LogCeverity::Critical)
                 .function("ensure_psuedo_user")
                 .description("Failed to do insert on pseudo user. Should not fail")
                 .metadata(json!({"error": e.to_string()}))
-                .log();
+                .log_async();
             warn!("Failed to ensure pseudo user exists for id {}: {}", id, e);
         }
         Ok(row) => {
             if row.rows_affected() != 0 {
-                _ = SystemLogBuilder::new(pool)
+                SystemLogBuilder::new(pool)
                     .action(LogAction::Create)
                     .ceverity(LogCeverity::Warning)
                     .function("ensure_psuedo_user")
                     .description("User had pseudo user that did not exist, so a new was created. This will cause ghost users")
-                    .log();
+                    .log_async();
                 warn!(
                     "Pseudo user {} did not exist and was created - potential ghost user",
                     id

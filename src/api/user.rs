@@ -197,6 +197,15 @@ pub async fn auth0_trigger_endpoint(
         }
     });
 
+    state
+        .syslog()
+        .action(LogAction::Create)
+        .ceverity(LogCeverity::Info)
+        .function("auth0_trigger_endpoint")
+        .description("New user registered via Auth0 post-registration trigger")
+        .metadata(json!({"base_user_id": base_user_id, "pseudo_id": pseudo_id.to_string()}))
+        .log_async();
+
     Ok((StatusCode::CREATED, Json(base_user_id)))
 }
 
@@ -310,6 +319,16 @@ pub async fn reset_password(
             .await
             .unwrap_or_else(|_| "No body".to_string());
         error!("Request to auth0 failed: {}", msg);
+        state
+            .syslog()
+            .action(LogAction::Other)
+            .ceverity(LogCeverity::Warning)
+            .function("reset_password")
+            .description("Auth0 password reset request failed - service may be unavailable")
+            .metadata(
+                json!({"email": request.email, "auth0_status": status.as_u16(), "response": msg}),
+            )
+            .log_async();
         return Err(ServerError::Api(
             StatusCode::SERVICE_UNAVAILABLE,
             "Request to auth0 failed".to_string(),

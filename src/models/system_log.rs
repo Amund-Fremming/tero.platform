@@ -48,7 +48,7 @@ pub enum LogAction {
 impl fmt::Display for LogAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogAction::Create => write!(f, "write"),
+            LogAction::Create => write!(f, "create"),
             LogAction::Read => write!(f, "read"),
             LogAction::Update => write!(f, "update"),
             LogAction::Delete => write!(f, "delete"),
@@ -72,8 +72,8 @@ pub enum SubjectType {
 impl fmt::Display for SubjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SubjectType::RegisteredUser => write!(f, "registered"),
-            SubjectType::GuestUser => write!(f, "guest"),
+            SubjectType::RegisteredUser => write!(f, "registered_user"),
+            SubjectType::GuestUser => write!(f, "guest_user"),
             SubjectType::Integration => write!(f, "integration"),
             SubjectType::System => write!(f, "system"),
         }

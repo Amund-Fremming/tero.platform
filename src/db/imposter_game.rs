@@ -21,7 +21,7 @@ pub async fn create_imposter_game(
     .await?;
 
     if row.rows_affected() == 0 {
-        warn!("Skipping spin game creation: id already exists");
+        warn!("Skipping imposter game creation: id already exists");
     }
 
     Ok(())
