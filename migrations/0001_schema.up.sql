@@ -131,7 +131,7 @@ CREATE TABLE "imposter_game" (
 
 CREATE TABLE "guess_game" (
     "id" UUID PRIMARY KEY,
-    "rounds" TEXT[] NOT NULL
+    "rounds" JSONB NOT NULL
 );
 
 CREATE TABLE "round_pool" (

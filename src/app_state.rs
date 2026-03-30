@@ -300,7 +300,7 @@ impl AppState {
                         }
                     };
 
-                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds).await {
+                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds.0).await {
                         error!("Round pool bg job failed to fill rounds: {}", e);
                         continue;
                     }

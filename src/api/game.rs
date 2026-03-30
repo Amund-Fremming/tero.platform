@@ -357,7 +357,10 @@ async fn initiate_random_interactive_session(
         GameType::Duel => SpinSession::from_duel_rounds(user_id, game_id, rounds).to_json(),
         GameType::Roulette => SpinSession::from_roulette_rounds(user_id, game_id, rounds).to_json(),
         GameType::Imposter => ImposterSession::from_rounds(user_id, game_id, rounds).to_json(),
-        GameType::Guess => GuessSession::from_rounds(user_id, game_id, rounds).to_json(),
+        GameType::Guess => {
+            let rounds = get_random_rounds(state.get_pool(), game_type, 20).await?;
+            GuessSession::from_rounds(user_id, game_id, rounds).to_json()
+        }
         _ => {
             error!(
                 "Create random interactive game not supported for game type {}",

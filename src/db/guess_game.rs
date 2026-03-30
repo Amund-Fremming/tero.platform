@@ -2,6 +2,9 @@ use sqlx::{Executor, Pool, Postgres};
 use tracing::warn;
 use uuid::Uuid;
 
+#[allow(unused_imports)] // Needed for sqlx macros
+use crate::models::guess_game::GuessRound;
+
 use crate::models::guess_game::GuessGame;
 
 pub async fn get_guess_game_by_id(
@@ -11,8 +14,8 @@ pub async fn get_guess_game_by_id(
     sqlx::query_as!(
         GuessGame,
         r#"
-        SELECT id, rounds 
-        FROM "quiz_game" 
+        SELECT id, rounds as "rounds!: sqlx::types::Json<Vec<GuessRound>>"
+        FROM "guess_game" 
         WHERE id = $1
         "#,
         game_id
@@ -31,7 +34,7 @@ where
         VALUES ($1, $2)
         "#,
         game.id,
-        &game.rounds
+        game.rounds as _
     )
     .execute(executor)
     .await?;
