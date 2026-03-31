@@ -72,16 +72,17 @@ pub async fn link_pseudo_to_base_user(
 /// NOTE: Only db function allowed to write system logs
 pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
     let last_active = Utc::now();
-    let result = sqlx::query!(
+    let result: Result<bool, sqlx::Error> = sqlx::query_scalar!(
         r#"
         INSERT INTO "pseudo_user" (id, last_active)
         VALUES ($1, $2)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET last_active = EXCLUDED.last_active
+        RETURNING (xmax = 0) AS "inserted!"
         "#,
         id,
         last_active
     )
-    .execute(pool)
+    .fetch_one(pool)
     .await;
 
     match result {
@@ -95,8 +96,8 @@ pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
                 .log_async();
             warn!("Failed to ensure pseudo user exists for id {}: {}", id, e);
         }
-        Ok(row) => {
-            if row.rows_affected() != 0 {
+        Ok(inserted) => {
+            if inserted {
                 SystemLogBuilder::new(pool)
                     .action(LogAction::Create)
                     .ceverity(LogCeverity::Warning)
