@@ -96,16 +96,16 @@ async fn ensure_pseudo_user(
     State(state): State<Arc<AppState>>,
     Query(query): Query<EnsureUserQuery>,
 ) -> Result<impl IntoResponse, ServerError> {
-    let pseudo_id = match query.pseudo_id {
-        None => create_pseudo_user(state.get_pool()).await?,
+    let (pseudo_id, created) = match query.pseudo_id {
+        None => (create_pseudo_user(state.get_pool()).await?, true),
         Some(mut pseudo_id) => {
             let exists = pseudo_user_exists(state.get_pool(), pseudo_id).await?;
-            if exists {
-                return Ok((StatusCode::OK, Json(pseudo_id)));
+            if !exists {
+                pseudo_id = create_pseudo_user(state.get_pool()).await?;
+                (pseudo_id, true)
+            } else {
+                (pseudo_id, false)
             }
-
-            pseudo_id = create_pseudo_user(state.get_pool()).await?;
-            pseudo_id
         }
     };
 
@@ -128,7 +128,12 @@ async fn ensure_pseudo_user(
         };
     });
 
-    Ok((StatusCode::CREATED, Json(pseudo_id)))
+    let status = if created {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((status, Json(pseudo_id)))
 }
 
 async fn patch_user(
