@@ -72,7 +72,7 @@ pub async fn link_pseudo_to_base_user(
 /// NOTE: Only db function allowed to write system logs
 pub async fn ensure_pseudo_user(pool: &Pool<Postgres>, id: Uuid) {
     let last_active = Utc::now();
-    let result: Result<bool, sqlx::Error> = sqlx::query_scalar!(
+    let result = sqlx::query_scalar!(
         r#"
         INSERT INTO "pseudo_user" (id, last_active)
         VALUES ($1, $2)
