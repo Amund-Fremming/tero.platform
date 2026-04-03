@@ -3,7 +3,7 @@ env = "prd"
 [server]
 address = "0.0.0.0"
 port = 8080
-gs_domain = "http://localhost:9000"
+gs_domain = "https://terosession-production-34ce.up.railway.app"
 page_size = 20
 
 [auth0]
