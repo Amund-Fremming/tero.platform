@@ -129,11 +129,6 @@ CREATE TABLE "imposter_game" (
     "rounds" TEXT[] NOT NULL
 );
 
-CREATE TABLE "guess_game" (
-    "id" UUID PRIMARY KEY,
-    "rounds" JSONB NOT NULL
-);
-
 CREATE TABLE "round_pool" (
     "id" BIGSERIAL PRIMARY KEY,
     "game_type" game_type NOT NULL,

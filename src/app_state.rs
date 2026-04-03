@@ -15,7 +15,6 @@ use crate::{
     config::app_config::CONFIG,
     db::{
         game_base::{delete_stale_games, fill_rounds_pool},
-        guess_game::get_guess_game_by_id,
         imposter_game::get_imposter_game_by_id,
         quiz_game::get_quiz_game_by_id,
         spin_game::get_spin_game_by_id,
@@ -266,20 +265,7 @@ impl AppState {
                         continue;
                     }
                 }
-                GameType::Quiz => {
-                    let game = match get_quiz_game_by_id(pool, game_id).await {
-                        Ok(game) => game,
-                        Err(e) => {
-                            error!("Round pool bg job failed to get quiz game: {}", e);
-                            continue;
-                        }
-                    };
 
-                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds).await {
-                        error!("Round pool bg job failed to fill rounds: {}", e);
-                        continue;
-                    }
-                }
                 GameType::Imposter => {
                     let game = match get_imposter_game_by_id(pool, game_id).await {
                         Ok(game) => game,
@@ -294,16 +280,17 @@ impl AppState {
                         continue;
                     }
                 }
-                GameType::Guess => {
-                    let game = match get_guess_game_by_id(pool, game_id).await {
+
+                GameType::Quiz => {
+                    let game = match get_quiz_game_by_id(pool, game_id).await {
                         Ok(game) => game,
                         Err(e) => {
-                            error!("Round pool bg job failed to get guess game: {}", e);
+                            error!("Round pool bg job failed to get quiz game: {}", e);
                             continue;
                         }
                     };
 
-                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds.0).await {
+                    if let Err(e) = fill_rounds_pool(pool, game_type, game.rounds).await {
                         error!("Round pool bg job failed to fill rounds: {}", e);
                         continue;
                     }

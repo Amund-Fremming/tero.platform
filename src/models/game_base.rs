@@ -107,7 +107,6 @@ pub enum GameType {
     Duel,
     Quiz,
     Imposter,
-    Guess,
 }
 
 impl GameType {
@@ -117,7 +116,6 @@ impl GameType {
             GameType::Duel => "duel",
             GameType::Roulette => "roulette",
             GameType::Imposter => "imposter",
-            GameType::Guess => "guess",
         }
     }
 
@@ -126,7 +124,6 @@ impl GameType {
             GameType::Quiz => "quiz",
             GameType::Duel | GameType::Roulette => "spin",
             GameType::Imposter => "imposter",
-            GameType::Guess => "guess",
         }
     }
 }

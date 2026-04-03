@@ -2,7 +2,6 @@ pub mod auth;
 pub mod error;
 pub mod game_base;
 pub mod game_tip;
-pub mod guess_game;
 pub mod imposter_game;
 pub mod integration;
 pub mod quiz_game;
