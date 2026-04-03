@@ -3,10 +3,16 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 
-pub static INTEGRATION_NAMES: Lazy<Mutex<HashMap<String, IntegrationName>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+use crate::config::app_config::CONFIG;
+
+pub static INTEGRATION_NAMES: Lazy<HashMap<String, IntegrationName>> = Lazy::new(|| {
+    CONFIG
+        .integrations
+        .iter()
+        .map(|i| (i.subject.clone(), i.name.clone()))
+        .collect()
+});
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct IntegrationConfig {
@@ -32,12 +38,11 @@ impl fmt::Display for IntegrationName {
 }
 
 impl IntegrationName {
-    pub async fn from_subject(
+    pub fn from_subject(
         subject: &str,
-        integrations: &Mutex<HashMap<String, IntegrationName>>,
+        integrations: &HashMap<String, IntegrationName>,
     ) -> Option<IntegrationName> {
         let stripped = subject.strip_suffix("@clients")?;
-        let lock = integrations.lock().await;
-        lock.get(stripped).cloned()
+        integrations.get(stripped).cloned()
     }
 }

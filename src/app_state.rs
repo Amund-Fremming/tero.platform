@@ -49,8 +49,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn from_connection_string(connection_string: &str) -> Result<Arc<Self>, ServerError> {
-        let pool = Pool::<Postgres>::connect(connection_string).await?;
+    pub async fn from_pool(pool: Pool<Postgres>) -> Result<Arc<Self>, ServerError> {
         let client = Client::new();
         let gs_client = GSClient::new(&CONFIG.server.gs_domain, client.clone());
 
@@ -62,7 +61,7 @@ impl AppState {
         let popup_manager = PopupManager::new();
         let round_pool_sender = Arc::new(Mutex::new(None));
 
-        let state = Arc::new(Self {
+        Ok(Arc::new(Self {
             pool,
             jwks,
             client,
@@ -71,9 +70,13 @@ impl AppState {
             key_vault,
             popup_manager,
             round_pool_sender,
-        });
+        }))
+    }
 
-        Ok(state)
+    #[cfg(test)]
+    pub async fn from_connection_string(connection_string: &str) -> Result<Arc<Self>, ServerError> {
+        let pool = Pool::<Postgres>::connect(connection_string).await?;
+        Self::from_pool(pool).await
     }
 
     pub fn get_pool(&self) -> &Pool<Postgres> {

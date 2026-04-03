@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use axum::{Router, middleware::from_fn_with_state, routing::post};
 use dotenvy::dotenv;
+use sqlx::Pool;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -17,10 +16,7 @@ use crate::{
     },
     app_state::AppState,
     config::app_config::CONFIG,
-    models::{
-        error::ServerError,
-        integration::{INTEGRATION_NAMES, IntegrationName},
-    },
+    models::integration::INTEGRATION_NAMES,
 };
 
 mod api;
@@ -42,8 +38,17 @@ async fn main() {
         .with(EnvFilter::from_default_env())
         .init();
 
-    // Initialize state
-    let state = AppState::from_connection_string(&CONFIG.database_url)
+    // Connect once, run migrations, then hand the pool to AppState.
+    // KeyVault queries the DB on init so migrations must run first.
+    let pool = Pool::<sqlx::Postgres>::connect(&CONFIG.database_url)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e));
+    if let Err(e) = sqlx::migrate!().run(&pool).await {
+        error!("Failed to run migrations: {}", e);
+        return;
+    }
+
+    let state = AppState::from_pool(pool)
         .await
         .unwrap_or_else(|e| panic!("{}", e));
 
@@ -51,17 +56,8 @@ async fn main() {
     state.spawn_game_cleanup();
     state.spawn_round_pool_job();
 
-    // Initiate integrations
-    if let Err(e) = load_integrations().await {
-        error!("Failed to load integrations: {}", e);
-        return;
-    }
-
-    // Run migrations
-    if let Err(e) = sqlx::migrate!().run(state.get_pool()).await {
-        error!("Failed to run migrations: {}", e);
-        return;
-    }
+    // Force static initialization of INTEGRATION_NAMES from config
+    let _ = &*INTEGRATION_NAMES;
 
     let event_routes = Router::new()
         .route("/{pseudo_id}", post(auth0_trigger_endpoint))
@@ -96,20 +92,4 @@ async fn main() {
         listener.local_addr().unwrap()
     );
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn load_integrations() -> Result<(), ServerError> {
-    let integrations = &CONFIG.integrations;
-
-    let integration_names: HashMap<String, IntegrationName> = integrations
-        .iter()
-        .map(|i| (i.subject.clone(), i.name.clone()))
-        .collect();
-
-    {
-        let mut lock = INTEGRATION_NAMES.lock().await;
-        *lock = integration_names;
-    }
-
-    Ok(())
 }

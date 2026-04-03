@@ -86,8 +86,7 @@ async fn handle_token_header(
 
     let subject = match claims.is_machine() {
         true => {
-            let Some(int_name) =
-                IntegrationName::from_subject(&claims.sub, &INTEGRATION_NAMES).await
+            let Some(int_name) = IntegrationName::from_subject(&claims.sub, &INTEGRATION_NAMES)
             else {
                 warn!(
                     "Unknown integration subject attempted authentication: {}",
