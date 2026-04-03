@@ -2,7 +2,7 @@ env = "prd"
 
 [server]
 address = "0.0.0.0"
-port = 3000
+port = 8080
 gs_domain = "http://localhost:9000"
 page_size = 20
 
