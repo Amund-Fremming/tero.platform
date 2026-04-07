@@ -38,3 +38,8 @@ Before running the project locally, make sure you have the following installed:
 - [Rust](https://www.rust-lang.org/)
 - [Docker](https://www.docker.com/)
 - Authentication setup as described in the [Auth0 documentation](docs/auth0.md)
+
+### TODO
+
+- add docs for auth 0, and how it flows (only one env for now(free tier))
+- add docs for railway (or for self managed server)
