@@ -28,7 +28,7 @@ tower = "0.5.2"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "fmt"] }
 uuid = { version = "1.16.0", features = ["serde", "v4"] }
-rand = "0.9.2"
+rand = "0.9.3"
 rand_chacha = "0.9.0"
 config = "0.15.16"
 dashmap = "6.1.0"
