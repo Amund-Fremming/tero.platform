@@ -16,7 +16,7 @@ use crate::{
     models::{
         auth::Claims,
         error::ServerError,
-        system_log::{CreateSyslogRequest, SyslogPageQuery},
+        system_log::{CreateClientLogRequest, CreateSyslogRequest, LogAction, SyslogPageQuery},
         user::{Permission, SubjectId},
     },
 };
@@ -25,6 +25,7 @@ pub fn log_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", post(create_system_log).get(get_system_log_page))
         .route("/count", get(get_log_category_count))
+        .route("/client", post(create_client_log))
         .with_state(state)
 }
 
@@ -93,6 +94,34 @@ async fn create_system_log(
     }
 
     builder.log_async();
+
+    Ok(StatusCode::CREATED)
+}
+
+async fn create_client_log(
+    State(state): State<Arc<AppState>>,
+    Extension(subject_id): Extension<SubjectId>,
+    Json(request): Json<CreateClientLogRequest>,
+) -> Result<impl IntoResponse, ServerError> {
+    match &subject_id {
+        SubjectId::PseudoUser(_) | SubjectId::BaseUser(_) => {}
+        _ => return Err(ServerError::AccessDenied),
+    };
+
+    let mut description = request.description;
+    if description.len() > 512 {
+        description = format!("{}...", &description[..509]);
+    }
+
+    state
+        .syslog()
+        .subject(subject_id)
+        .action(LogAction::Other)
+        .ceverity(request.ceverity)
+        .function(&request.function)
+        .description(&description)
+        .metadata(request.metadata.unwrap_or_default())
+        .log_async();
 
     Ok(StatusCode::CREATED)
 }

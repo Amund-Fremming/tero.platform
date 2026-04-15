@@ -98,6 +98,14 @@ pub struct CreateSyslogRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct CreateClientLogRequest {
+    pub ceverity: LogCeverity,
+    pub function: String,
+    pub description: String,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LogCategoryCount {
     pub info: i64,
     pub warning: i64,
