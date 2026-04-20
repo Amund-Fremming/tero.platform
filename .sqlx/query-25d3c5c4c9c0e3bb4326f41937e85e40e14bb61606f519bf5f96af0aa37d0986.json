@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE beer_tracker_members SET count = count + $3 WHERE game_id = $1 AND name = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "25d3c5c4c9c0e3bb4326f41937e85e40e14bb61606f519bf5f96af0aa37d0986"
+}

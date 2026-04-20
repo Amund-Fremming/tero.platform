@@ -1,4 +1,5 @@
 pub mod auth_mw;
+pub mod beer_tracker;
 pub mod game;
 pub mod game_tip;
 pub mod gs_client;

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, can_size, goal FROM beer_tracker_games WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "can_size",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "goal",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "cfcb57ce5d685eec545d2550bc63b8f1564c51f5ef2bf395c07b06b436ff6baa"
+}

@@ -11,9 +11,10 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    api::gs_client::GSClient,
+    api::{beer_tracker::BeerTrackerCache, gs_client::GSClient},
     config::app_config::CONFIG,
     db::{
+        beer_tracker::delete_stale_games as delete_stale_beer_games,
         game_base::{delete_stale_games, fill_rounds_pool},
         imposter_game::get_imposter_game_by_id,
         quiz_game::get_quiz_game_by_id,
@@ -42,6 +43,7 @@ pub struct AppState {
     page_cache: Arc<GustCache<PagedResponse<GameBase>>>,
     key_vault: Arc<KeyVault>,
     popup_manager: PopupManager,
+    beer_cache: BeerTrackerCache,
 
     /// Channel used to queue up a new game to write its rounds to the round pool
     round_pool_sender: RoundPoolSender,
@@ -58,6 +60,7 @@ impl AppState {
         let page_cache = Arc::new(GustCache::from_ttl(120));
         let key_vault = Arc::new(KeyVault::load_words(&pool).await?);
         let popup_manager = PopupManager::new();
+        let beer_cache = BeerTrackerCache::new();
         let round_pool_sender = Arc::new(Mutex::new(None));
 
         Ok(Arc::new(Self {
@@ -68,6 +71,7 @@ impl AppState {
             page_cache,
             key_vault,
             popup_manager,
+            beer_cache,
             round_pool_sender,
         }))
     }
@@ -110,6 +114,10 @@ impl AppState {
         &self.popup_manager
     }
 
+    pub fn get_beer_cache(&self) -> &BeerTrackerCache {
+        &self.beer_cache
+    }
+
     pub fn spawn_game_cleanup(&self) {
         let pool = self.get_pool().clone();
 
@@ -135,6 +143,13 @@ impl AppState {
                             .log()
                             .await;
                     }
+                }
+
+                // Also clean up stale beer tracker games (>24h)
+                match delete_stale_beer_games(&pool).await {
+                    Ok(n) if n > 0 => info!("Beer tracker cleanup: purged {} stale game(s)", n),
+                    Err(e) => warn!("Beer tracker cleanup failed: {}", e),
+                    _ => {}
                 }
             }
         });

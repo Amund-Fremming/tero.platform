@@ -1,3 +1,4 @@
+pub mod beer_tracker;
 pub mod game_base;
 pub mod game_tip;
 pub mod health;

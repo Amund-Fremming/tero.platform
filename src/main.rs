@@ -7,6 +7,7 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 use crate::{
     api::{
         auth_mw::auth_mw,
+        beer_tracker::beer_tracker_routes,
         game::game_routes,
         game_tip::{protected_game_tip_routes, public_game_tip_routes},
         health::health_routes,
@@ -67,7 +68,8 @@ async fn main() {
     let public_routes = Router::new()
         .nest("/health", health_routes(state.clone()))
         .nest("/pseudo-users", public_auth_routes(state.clone()))
-        .nest("/tips", public_game_tip_routes(state.clone()));
+        .nest("/tips", public_game_tip_routes(state.clone()))
+        .nest("/beer-tracker", beer_tracker_routes(state.clone()));
 
     let protected_routes = Router::new()
         .nest("/games", game_routes(state.clone()))

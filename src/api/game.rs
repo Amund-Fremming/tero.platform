@@ -132,6 +132,19 @@ async fn join_interactive_game(
         return Err(ServerError::AccessDenied);
     }
 
+    // Check beer tracker first (single-word game IDs)
+    let beer_key = key_word.trim().to_lowercase();
+    if state.get_beer_cache().contains(&beer_key) {
+        let response = JoinGameResponse {
+            game_key: beer_key,
+            hub_name: "non-hub:beertracker".to_string(),
+            game_id: Uuid::nil(),
+            game_type: GameType::Roulette,
+            is_draft: false,
+        };
+        return Ok((StatusCode::OK, Json(response)));
+    }
+
     let words: Vec<&str> = key_word.trim().split(" ").collect();
     let tuple = match (words.first(), words.get(1)) {
         (Some(p), Some(s)) => (p.to_string(), s.to_string()),

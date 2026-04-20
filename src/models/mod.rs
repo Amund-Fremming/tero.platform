@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod beer_tracker;
 pub mod error;
 pub mod game_base;
 pub mod game_tip;
