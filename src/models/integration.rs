@@ -26,6 +26,7 @@ pub struct IntegrationConfig {
 pub enum IntegrationName {
     Auth0,
     Session,
+    Platform,
 }
 
 impl fmt::Display for IntegrationName {
@@ -33,6 +34,7 @@ impl fmt::Display for IntegrationName {
         match self {
             IntegrationName::Auth0 => write!(f, "auth0"),
             IntegrationName::Session => write!(f, "game_session"),
+            IntegrationName::Platform => write!(f, "platform"),
         }
     }
 }

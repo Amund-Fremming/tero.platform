@@ -5,14 +5,14 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, patch, post, put},
+    routing::{delete, get, patch, post, put},
 };
 
 use crate::{
     api::validation::ValidatedJson,
     app_state::AppState,
     config::app_config::CONFIG,
-    models::user::{ListUsersQuery, ResetPasswordRequest},
+    models::user::{DeleteUserQuery, ListUsersQuery, ResetPasswordRequest},
 };
 use serde_json::json;
 use tracing::{debug, error, info, warn};
@@ -22,8 +22,8 @@ use crate::{
     db::{
         self,
         user::{
-            create_base_user, create_pseudo_user, get_base_user_by_id, link_pseudo_to_base_user,
-            list_base_users, patch_base_user_by_id, pseudo_user_exists,
+            create_base_user, create_pseudo_user, delete_base_user, get_base_user_by_id,
+            link_pseudo_to_base_user, list_base_users, patch_base_user_by_id, pseudo_user_exists,
             update_pseudo_user_activity,
         },
     },
@@ -50,6 +50,7 @@ pub fn protected_auth_routes(state: Arc<AppState>) -> Router {
         .route("/activity-stats", get(get_user_activity_stats))
         .route("/popups", put(update_client_popup))
         .route("/reset-password", post(reset_password))
+        .route("/delete", delete(delete_user))
         .route("/{user_id}", patch(patch_user))
         .with_state(state)
 }
@@ -163,6 +164,105 @@ async fn patch_user(
 
     let user = patch_base_user_by_id(state.get_pool(), &uid, request).await?;
     Ok((StatusCode::OK, Json(user)).into_response())
+}
+
+async fn delete_user(
+    State(state): State<Arc<AppState>>,
+    Extension(subject): Extension<SubjectId>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<DeleteUserQuery>,
+) -> Result<impl IntoResponse, ServerError> {
+    let SubjectId::BaseUser(uid) = subject else {
+        return Err(ServerError::AccessDenied);
+    };
+
+    if uid != query.user_id
+        && claims
+            .missing_permission([Permission::WriteAdmin])
+            .is_some()
+    {
+        return Err(ServerError::AccessDenied);
+    }
+
+    let user = get_base_user_by_id(state.get_pool(), query.user_id)
+        .await?
+        .ok_or_else(|| ServerError::NotFound(format!("User {} not found", query.user_id)))?;
+
+    if let Some(auth0_id) = &user.auth0_id {
+        let token_payload = serde_json::json!({
+            "grant_type": "client_credentials",
+            "client_id": CONFIG.auth0.mgmt_client_id,
+            "client_secret": CONFIG.auth0.mgmt_client_secret,
+            "audience": format!("{}api/v2/", CONFIG.auth0.domain),
+        });
+
+        let token_response = state
+            .get_client()
+            .post(format!("{}oauth/token", CONFIG.auth0.domain))
+            .json(&token_payload)
+            .send()
+            .await?;
+
+        if !token_response.status().is_success() {
+            let msg = token_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "No body".to_string());
+            error!("Failed to obtain Auth0 management token: {}", msg);
+            return Err(ServerError::Api(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Failed to obtain Auth0 management token".to_string(),
+            ));
+        }
+
+        let token_json: serde_json::Value = token_response.json().await?;
+        let access_token = token_json["access_token"].as_str().ok_or_else(|| {
+            ServerError::Api(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Missing access_token in Auth0 response".to_string(),
+            )
+        })?;
+
+        let delete_response = state
+            .get_client()
+            .delete(format!("{}api/v2/users/{}", CONFIG.auth0.domain, auth0_id))
+            .bearer_auth(access_token)
+            .send()
+            .await?;
+
+        let status = delete_response.status();
+        if !status.is_success() && status.as_u16() != 404 {
+            let msg = delete_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "No body".to_string());
+            error!("Failed to delete user {} from Auth0: {}", auth0_id, msg);
+            return Err(ServerError::Api(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Failed to delete user from Auth0".to_string(),
+            ));
+        }
+    }
+
+    let deleted = delete_base_user(state.get_pool(), query.user_id).await?;
+    if !deleted {
+        return Err(ServerError::NotFound(format!(
+            "User {} not found",
+            query.user_id
+        )));
+    }
+
+    state
+        .syslog()
+        .subject(SubjectId::BaseUser(uid))
+        .action(LogAction::Delete)
+        .ceverity(LogCeverity::Info)
+        .function("delete_user")
+        .description("User account deleted")
+        .metadata(json!({"deleted_user_id": query.user_id}))
+        .log_async();
+
+    Ok(StatusCode::OK)
 }
 
 pub async fn auth0_trigger_endpoint(

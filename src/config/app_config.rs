@@ -83,6 +83,8 @@ pub struct Auth0Config {
     pub audience: String,
     pub client_id: String,
     pub webhook_key: String,
+    pub mgmt_client_id: String,
+    pub mgmt_client_secret: String,
     #[serde(default = "default_runtime")]
     pub runtime: Runtime,
 }

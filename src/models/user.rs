@@ -16,6 +16,11 @@ pub struct ListUsersQuery {
     pub page_num: u16,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DeleteUserQuery {
+    pub user_id: Uuid,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EnsureUserQuery {
     pub pseudo_id: Option<Uuid>,
