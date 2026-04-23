@@ -10,6 +10,7 @@ audience = "https://api.tero.com"
 client_id = "placeholder"
 webhook_key = "placeholder"
 mgmt_client_id = "oqaR79eS8q36bUnERUIzzRfGaHpTRHN1"
+mgmt_client_secret = "placeholder"
 
 [[integrations]]
 subject = "NmMLjTtX0XrnWjbe1JbRAgwEmn5lP3Sg"
