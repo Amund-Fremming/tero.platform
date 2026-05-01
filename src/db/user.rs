@@ -12,7 +12,7 @@ use crate::{
         system_log::{LogAction, LogCeverity},
         user::{
             ActivityStats, Auth0User, AverageUserStats, BaseUser, ListUsersQuery, PatchUserRequest,
-            RecentUserStats,
+            RecentUserStats, RegisteredUserStats,
         },
     },
     service::system_log_builder::SystemLogBuilder,
@@ -376,6 +376,19 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
     )
     .fetch_one(pool);
 
+    let registered_fut = sqlx::query_as!(
+        RegisteredUserStats,
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE b.created_at >= date_trunc('month', CURRENT_DATE)) AS "this_month_registered!",
+            COUNT(*) FILTER (WHERE b.created_at >= date_trunc('week', CURRENT_DATE)) AS "this_week_registered!",
+            COUNT(*) FILTER (WHERE b.created_at >= CURRENT_DATE) AS "todays_registered!"
+        FROM pseudo_user p
+        JOIN base_user b ON b.id = p.base_user_id
+        "#
+    )
+    .fetch_one(pool);
+
     let total_game_count_fut =
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM game_base").fetch_one(pool);
 
@@ -383,16 +396,19 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user").fetch_one(pool);
 
     type RecentStatsResult = Result<RecentUserStats, sqlx::Error>;
+    type RegisteredStatsResult = Result<RegisteredUserStats, sqlx::Error>;
     type AverageStatsResult = Result<AverageUserStats, sqlx::Error>;
     type StatsResult = Result<Option<i64>, sqlx::Error>;
 
-    let (recent, average, total_game_count, total_user_count): (
+    let (recent, registered, average, total_game_count, total_user_count): (
         RecentStatsResult,
+        RegisteredStatsResult,
         AverageStatsResult,
         StatsResult,
         StatsResult,
     ) = tokio::join!(
         recent_fut,
+        registered_fut,
         average_fut,
         total_game_count_fut,
         total_user_count_fut
@@ -402,6 +418,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         total_game_count: total_game_count?.unwrap_or(0),
         total_user_count: total_user_count?.unwrap_or(0),
         recent: recent?,
+        registered: registered?,
         average: average?,
     })
 }
