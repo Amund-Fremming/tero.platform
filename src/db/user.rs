@@ -337,6 +337,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
             COUNT(*) FILTER (WHERE last_active >= date_trunc('week', CURRENT_DATE)) AS "this_week_users!",
             COUNT(*) FILTER (WHERE last_active >= CURRENT_DATE) AS "todays_users!"
         FROM pseudo_user
+        WHERE base_user_id IS NULL
         "#
     )
     .fetch_one(pool);
@@ -351,6 +352,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 
                     WHERE last_active >= CURRENT_DATE - INTERVAL '6 months'
+                    AND base_user_id IS NULL
                     GROUP BY date_trunc('month', last_active)
                 ) t
             ), 0) AS "avg_month_users!",
@@ -360,6 +362,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 
                     WHERE last_active >= CURRENT_DATE - INTERVAL '8 weeks'
+                    AND base_user_id IS NULL
                     GROUP BY date_trunc('week', last_active)
                 ) t
             ), 0) AS "avg_week_users!",
@@ -369,6 +372,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
                     SELECT COUNT(*) AS cnt 
                     FROM pseudo_user 
                     WHERE last_active >= CURRENT_DATE - INTERVAL '30 days'
+                    AND base_user_id IS NULL
                     GROUP BY last_active::date
                 ) t
             ), 0) AS "avg_daily_users!"
@@ -380,7 +384,7 @@ pub async fn get_user_activity_stats(pool: &Pool<Postgres>) -> Result<ActivitySt
         sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM game_base").fetch_one(pool);
 
     let total_user_count_fut =
-        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user").fetch_one(pool);
+        sqlx::query_scalar!("SELECT COUNT(*)::bigint as count FROM pseudo_user WHERE base_user_id IS NULL").fetch_one(pool);
 
     type RecentStatsResult = Result<RecentUserStats, sqlx::Error>;
     type AverageStatsResult = Result<AverageUserStats, sqlx::Error>;
