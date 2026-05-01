@@ -101,7 +101,15 @@ pub struct ActivityStats {
     pub total_game_count: i64,
     pub total_user_count: i64,
     pub recent: RecentUserStats,
+    pub registered: RegisteredUserStats,
     pub average: AverageUserStats,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct RegisteredUserStats {
+    pub this_month_registered: i64,
+    pub this_week_registered: i64,
+    pub todays_registered: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
